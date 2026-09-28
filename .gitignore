@@ -1,0 +1,51 @@
+# =========================
+# 1. TÀI LIỆU & BỘ NHỚ AI
+# =========================
+# Khóa toàn bộ các file Markdown, thư mục báo cáo và dữ liệu AI
+*.md
+.ai/
+docs/
+
+# =========================
+# 2. CẤU HÌNH & MẬT KHẨU (NHẠY CẢM)
+# =========================
+# Tuyệt đối cấm đẩy biến môi trường và file chứa secret
+.env
+.env.*
+backend/src/main/resources/application.yml
+backend/src/main/resources/application-secret.yml
+backend/src/main/resources/application-prod.yml
+
+# Các chứng chỉ bảo mật, chữ ký điện tử
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+# =========================
+# 3. THƯ MỤC BUILD & LƯU TẠM
+# =========================
+# Không đẩy các thư mục nặng sinh ra trong quá trình compile
+backend/target/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.eslintcache
+
+# =========================
+# 4. FILE HỆ THỐNG, IDE & LOGS
+# =========================
+# Bỏ qua các file rác do Windows/Mac và trình biên dịch sinh ra
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+out/
+*.log
