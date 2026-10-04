@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface LaundryServiceRepository extends JpaRepository<LaundryService, Long> {
     List<LaundryService> findByShopIdIn(List<Long> shopIds);
+    List<LaundryService> findByShopId(Long shopId);
 }

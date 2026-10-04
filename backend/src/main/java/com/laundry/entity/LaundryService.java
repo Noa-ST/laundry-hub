@@ -22,9 +22,27 @@ public class LaundryService {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false, length = 20)
-    private String unit;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "unit_id")
+    private ServiceUnit unit;
 
-    @Column(nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private ServiceCategory category;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(255) default 'FIXED'")
+    @Builder.Default
+    private PriceType priceType = PriceType.FIXED;
+
     private Double price;
+
+    private Double minCharge;
+
+    @Column(length = 500)
+    private String description;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    @Builder.Default
+    private Boolean isActive = true;
 }

@@ -20,10 +20,10 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(unique = true, nullable = true, length = 100)
     private String email;
 
-    @Column(length = 20)
+    @Column(unique = true, nullable = false, length = 20)
     private String phone;
 
     @Column(nullable = false, length = 255)

@@ -1,6 +1,6 @@
 package com.laundry.controller;
 
-import com.laundry.common.dto.ApiResponse;
+import com.laundry.dto.response.ApiResponse;
 import com.laundry.dto.response.ShopResponseDTO;
 import com.laundry.service.ShopService;
 import lombok.RequiredArgsConstructor;

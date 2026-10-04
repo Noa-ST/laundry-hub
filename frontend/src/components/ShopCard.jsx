@@ -1,13 +1,23 @@
 import React, { useState } from 'react';
 import BookingModal from './BookingModal';
+import { useAuth } from '../context/AuthContext';
 
 const ShopCard = ({ shop, location }) => {
+    const { isAuthenticated } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const handleSuccess = () => {
         setIsModalOpen(false);
         alert("🎉 Đặt lịch thành công!");
         window.location.hash = 'orders';
+    };
+
+    const handleBookingClick = () => {
+        if (!isAuthenticated) {
+            window.dispatchEvent(new Event('auth:required'));
+        } else {
+            setIsModalOpen(true);
+        }
     };
 
     return (
@@ -50,7 +60,7 @@ const ShopCard = ({ shop, location }) => {
                 </div>
                 <div className="p-4 bg-gray-50 border-t border-gray-100">
                     <button 
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={handleBookingClick}
                         className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                     >
                         Đặt lịch ngay

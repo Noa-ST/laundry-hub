@@ -85,6 +85,12 @@ public class Order {
     @Column(length = 1000)
     private String note;
 
+    @Column(length = 1000)
+    private String cancelReason;
+
+    @Builder.Default
+    private Boolean isPaid = false;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

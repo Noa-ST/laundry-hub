@@ -1,6 +1,6 @@
 package com.laundry.common;
 
-import com.laundry.common.dto.ApiResponse;
+import com.laundry.dto.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

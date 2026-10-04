@@ -33,19 +33,19 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderResponseDTO createOrder(Long customerId, CreateOrderRequestDTO request) {
         if (request.items() == null || request.items().isEmpty()) {
-            throw new IllegalArgumentException("Đơn hàng phải có ít nhất một dịch vụ.");
+            throw new IllegalArgumentException("ÄÆ¡n hÃ ng pháº£i cÃ³ Ã­t nháº¥t má»™t dá»‹ch vá»¥.");
         }
         
         double totalQty = request.items().stream().mapToDouble(i -> i.quantity()).sum();
         if (totalQty <= 0) {
-            throw new IllegalArgumentException("Đơn hàng phải có ít nhất một dịch vụ.");
+            throw new IllegalArgumentException("ÄÆ¡n hÃ ng pháº£i cÃ³ Ã­t nháº¥t má»™t dá»‹ch vá»¥.");
         }
 
         User customer = userRepository.findById(customerId)
-                .orElseThrow(() -> new IllegalArgumentException("Khách hàng không tồn tại"));
+                .orElseThrow(() -> new IllegalArgumentException("KhÃ¡ch hÃ ng khÃ´ng tá»“n táº¡i"));
         
         Shop shop = shopRepository.findById(request.shopId())
-                .orElseThrow(() -> new IllegalArgumentException("Tiệm giặt không tồn tại"));
+                .orElseThrow(() -> new IllegalArgumentException("Tiá»‡m giáº·t khÃ´ng tá»“n táº¡i"));
 
         Order order = Order.builder()
                 .customer(customer)
@@ -65,10 +65,10 @@ public class OrderServiceImpl implements OrderService {
 
         for (var itemReq : request.items()) {
             LaundryService service = laundryServiceRepository.findById(itemReq.serviceId())
-                    .orElseThrow(() -> new IllegalArgumentException("Dịch vụ không tồn tại: " + itemReq.serviceId()));
+                    .orElseThrow(() -> new IllegalArgumentException("Dá»‹ch vá»¥ khÃ´ng tá»“n táº¡i: " + itemReq.serviceId()));
             
             if (!service.getShop().getId().equals(shop.getId())) {
-                throw new IllegalArgumentException("Dịch vụ không thuộc về tiệm này");
+                throw new IllegalArgumentException("Dá»‹ch vá»¥ khÃ´ng thuá»™c vá» tiá»‡m nÃ y");
             }
 
             BigDecimal itemPrice = BigDecimal.valueOf(service.getPrice());
@@ -85,7 +85,7 @@ public class OrderServiceImpl implements OrderService {
             order.addItem(orderItem);
         }
 
-        // Logic Phí Ship
+        // Logic PhÃ­ Ship
         BigDecimal shippingFee = BigDecimal.ZERO;
         int shippingLegs = 0;
         if (request.inboundMethod() == InboundMethod.STORE_PICKUP) shippingLegs++;
@@ -93,7 +93,7 @@ public class OrderServiceImpl implements OrderService {
         
         if (shippingLegs > 0) {
             if (request.userLat() == null || request.userLng() == null) {
-                throw new IllegalArgumentException("Không xác định được vị trí giao nhận.");
+                throw new IllegalArgumentException("KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c vá»‹ trÃ­ giao nháº­n.");
             }
 
             double distanceKm = GeoUtils.calculateDistance(
@@ -102,7 +102,7 @@ public class OrderServiceImpl implements OrderService {
             );
 
             if (distanceKm > MAX_SHIPPING_RADIUS_KM) {
-                throw new IllegalArgumentException("Tiệm chỉ nhận giao nhận tận nơi trong bán kính 10km.");
+                throw new IllegalArgumentException("Tiá»‡m chá»‰ nháº­n giao nháº­n táº­n nÆ¡i trong bÃ¡n kÃ­nh 10km.");
             }
 
             shippingFee = calculateShippingFee(distanceKm, shippingLegs);
@@ -140,7 +140,7 @@ public class OrderServiceImpl implements OrderService {
                         item.getService().getName(),
                         item.getQuantity(),
                         item.getPriceAtBooking(),
-                        item.getService().getUnit()
+                        item.getService().getUnit() != null ? item.getService().getUnit().getName() : ""
                 ))
                 .collect(Collectors.toList());
 

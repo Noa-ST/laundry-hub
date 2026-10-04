@@ -1,6 +1,6 @@
 package com.laundry.mockuser.controller;
 
-import com.laundry.common.dto.ApiResponse;
+import com.laundry.dto.response.ApiResponse;
 import com.laundry.mockuser.dto.MockUserResponseDTO;
 import com.laundry.mockuser.service.MockUserService;
 import lombok.RequiredArgsConstructor;

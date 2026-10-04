@@ -36,8 +36,22 @@ public class Shop {
 
     @Column(nullable = false)
     private Double longitude;
+    
+    @Column(length = 20)
+    private String phone;
 
-    @Column(nullable = false)
+    @Column(length = 50)
+    private String operatingHours;
+
+    @Column(nullable = false, columnDefinition = "integer default 1")
+    @Builder.Default
+    private Integer totalWashers = 1;
+
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    @Builder.Default
+    private Integer totalDryers = 0;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
     @Builder.Default
     private Boolean isActive = true;
 

@@ -3,8 +3,11 @@ package com.laundry.entity;
 public enum OrderStatus {
     PENDING,
     CONFIRMED,
-    WASHING,
+    PICKING_UP,
+    RECEIVED,
+    PROCESSING,
     READY,
+    DELIVERING,
     COMPLETED,
     CANCELLED
 }
