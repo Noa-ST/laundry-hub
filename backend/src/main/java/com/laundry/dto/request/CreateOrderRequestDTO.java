@@ -1,7 +1,7 @@
 package com.laundry.dto.request;
-import com.laundry.entity.InboundMethod;
-import com.laundry.entity.OutboundMethod;
-import com.laundry.entity.PaymentMethod;
+import com.laundry.enums.InboundType;
+import com.laundry.enums.OutboundType;
+import com.laundry.enums.PaymentMethod;
 import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -12,14 +12,14 @@ public record CreateOrderRequestDTO(
     String note,
     @NotEmpty List<OrderItemRequestDTO> items,
     
-    @NotNull InboundMethod inboundMethod,
-    @NotNull OutboundMethod outboundMethod,
-    @NotNull PaymentMethod paymentMethod,
+    @NotNull InboundType inboundType,
+    @NotNull OutboundType outboundType,
     
     String receiverName,
     String receiverPhone,
     String deliveryAddress,
     
     Double userLat,
-    Double userLng
+    Double userLng,
+    String voucherCode
 ) {}

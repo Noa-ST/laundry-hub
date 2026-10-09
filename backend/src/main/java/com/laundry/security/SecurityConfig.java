@@ -66,10 +66,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/shops/**").permitAll()
                         .requestMatchers("/api/v1/health").permitAll()
                         .requestMatchers("/api/v1/mock-users").permitAll()
+                        .requestMatchers("/api/v1/payments/payos-webhook").permitAll()
+                        .requestMatchers("/api/v1/vouchers/validate").permitAll()
+                        .requestMatchers("/api/v1/vouchers/shop/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         
                         .requestMatchers("/api/v1/owner/**").hasRole("SHOP_OWNER")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/orders/*/messages").hasAnyRole("CUSTOMER", "SHOP_OWNER")
                         .requestMatchers("/api/v1/orders/**").hasRole("CUSTOMER")
                         
                         .anyRequest().authenticated()
@@ -86,7 +90,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("http://localhost:5173"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+        configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

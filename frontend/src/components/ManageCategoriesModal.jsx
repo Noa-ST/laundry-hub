@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axiosClient from '../api/axiosClient';
+import toast from 'react-hot-toast';
 
 const ManageCategoriesModal = ({ isOpen, onClose }) => {
     const [categories, setCategories] = useState([]);
@@ -37,7 +38,7 @@ const ManageCategoriesModal = ({ isOpen, onClose }) => {
             setNewCategoryName('');
             fetchCategories();
         } catch (error) {
-            alert('Lỗi thêm nhóm dịch vụ');
+            toast.error('Lỗi thêm nhóm dịch vụ');
         } finally {
             setIsAdding(false);
         }
@@ -49,7 +50,7 @@ const ManageCategoriesModal = ({ isOpen, onClose }) => {
             await axiosClient.delete(`/owner/categories/${id}`);
             fetchCategories();
         } catch (error) {
-            alert(error.response?.data?.message || 'Lỗi xóa nhóm dịch vụ. Có thể đang có dịch vụ sử dụng nhóm này.');
+            toast.error(error.response?.data?.message || 'Lỗi xóa nhóm dịch vụ. Có thể đang có dịch vụ sử dụng nhóm này.');
         }
     };
 

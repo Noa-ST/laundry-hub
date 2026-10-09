@@ -1,14 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import axiosClient from '../api/axiosClient';
 import { useCurrentLocation } from '../hooks/useCurrentLocation';
 import ShopCard from '../components/ShopCard';
+import ShopMapView from '../components/ShopMapView';
+import LocationPickerMap from '../components/LocationPickerMap';
 
 const ShopDiscoveryPage = () => {
-    const { location, error: locError, loading: locLoading } = useCurrentLocation();
+    const { location, error: locError, loading: locLoading, setLocation } = useCurrentLocation();
     const [shops, setShops] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [radius, setRadius] = useState(15); // Default 15km
+    const [radius, setRadius] = useState(15);
+    const [activeFilter, setActiveFilter] = useState('ALL');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [viewMode, setViewMode] = useState('grid');
+    const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+    const [tempLat, setTempLat] = useState(null);
+    const [tempLng, setTempLng] = useState(null);
 
     useEffect(() => {
         if (!location) return;
@@ -30,77 +39,223 @@ const ShopDiscoveryPage = () => {
         fetchShops();
     }, [location, radius]);
 
+    // Client-side filtering
+    const filteredShops = shops.filter(shop => {
+        const matchSearch = shop.name.toLowerCase().includes(searchQuery.toLowerCase()) || (shop.address && shop.address.toLowerCase().includes(searchQuery.toLowerCase()));
+        let matchFilter = true;
+        if (activeFilter === 'OPEN') matchFilter = shop.isActive;
+        if (activeFilter === 'DELIVERY') matchFilter = shop.maxDeliveryDistance > 0;
+        if (activeFilter === 'PREMIUM') matchFilter = shop.rating >= 4.8; // Example premium criteria
+        return matchSearch && matchFilter;
+    });
+
     return (
-        <div className="min-h-screen bg-gray-50 p-4 md:p-8 pt-20">
-            <div className="max-w-6xl mx-auto">
-                <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Khám phá Tiệm giặt gần bạn</h1>
-                        <p className="text-gray-500 mt-2">
-                            {locLoading ? "Đang định vị vị trí của bạn..." : 
-                             locError ? locError : `Đang tìm tiệm giặt quanh toạ độ: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`}
-                        </p>
+        <div className="bg-slate-50/60 font-sans pb-12">
+            
+            {/* Hero Section */}
+            <div className="relative pb-16 pt-12 overflow-hidden">
+                {/* Background Image & Overlay */}
+                <div className="absolute inset-0">
+                    <img 
+                        src="https://images.unsplash.com/photo-1517677208171-0bc6725a3e60?q=80&w=2070&auto=format&fit=crop" 
+                        alt="Laundry Background" 
+                        className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-slate-900/40"></div>
+                </div>
+                
+                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white z-10 pt-4">
+                    <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-4 text-shadow-md">
+                        Tìm Tiệm Giặt Tốt Nhất Quanh Bạn
+                    </h1>
+                    <p className="text-teal-50 max-w-2xl mx-auto text-lg md:text-xl font-semibold mb-8 text-shadow-sm">
+                        Giặt thảnh thơi - Giao tận nơi
+                    </p>
+                    <p className="text-teal-100/80 max-w-2xl mx-auto text-sm md:text-base font-medium mb-8">
+                        Khám phá hàng trăm tiệm giặt chất lượng, giá cả minh bạch và dịch vụ giao nhận tận nơi.
+                    </p>
+                    
+                    {/* Location UI */}
+                    <div className="inline-flex items-center justify-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 shadow-sm text-sm">
+                        <svg className="w-5 h-5 text-amber-300" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="font-semibold">
+                            {locLoading ? "Đang định vị..." : locError ? locError : "Vị trí của bạn"}
+                        </span>
+                        {!locLoading && !locError && (
+                            <span className="text-teal-100 ml-1 border-l border-white/30 pl-2 opacity-80 text-xs hidden sm:inline-block">
+                                {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+                            </span>
+                        )}
+                        {!locLoading && (
+                            <button onClick={() => {
+                                setTempLat(location?.lat || 10.7769);
+                                setTempLng(location?.lng || 106.7009);
+                                setIsLocationModalOpen(true);
+                            }} className="text-white hover:text-amber-200 font-bold ml-2 transition-colors">Thay đổi</button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20">
+                {/* Search & Filters Card */}
+                <div className="bg-white rounded-2xl shadow-md border border-slate-200/60 p-4 md:p-6 mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
+                    
+                    {/* Search Bar */}
+                    <div className="relative w-full md:w-1/3 shrink-0">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Tên tiệm, địa chỉ..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all"
+                        />
+                    </div>
+
+                    {/* Filter Chips */}
+                    <div className="flex overflow-x-auto custom-scrollbar gap-2 w-full md:w-auto pb-2 md:pb-0">
+                        {[
+                            { id: 'ALL', label: 'Tất cả' },
+                            { id: 'OPEN', label: 'Đang mở cửa' },
+                            { id: 'DELIVERY', label: 'Có lấy tận nơi' },
+                            { id: 'PREMIUM', label: 'Tiệm nổi bật' }
+                        ].map(filter => (
+                            <button 
+                                key={filter.id}
+                                onClick={() => setActiveFilter(filter.id)}
+                                className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+                                    activeFilter === filter.id 
+                                    ? 'bg-teal-600 text-white border-teal-600 shadow-sm' 
+                                    : 'bg-white text-slate-600 border-slate-200 hover:border-teal-500/30 hover:bg-teal-50'
+                                }`}
+                            >
+                                {filter.label}
+                            </button>
+                        ))}
                     </div>
                     
-                    {!locLoading && (
-                        <div className="flex items-center space-x-3 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-                            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Bán kính:</label>
-                            <select 
-                                value={radius} 
-                                onChange={(e) => setRadius(Number(e.target.value))}
-                                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2"
+                    {/* Radius Dropdown */}
+                    <div className="flex items-center space-x-2 shrink-0">
+                        <select 
+                            value={radius} 
+                            onChange={(e) => setRadius(Number(e.target.value))}
+                            className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all cursor-pointer"
+                        >
+                            <option value={5}>Dưới 5 km</option>
+                            <option value={15}>Dưới 15 km</option>
+                            <option value={50}>Dưới 50 km</option>
+                            <option value={5000}>Toàn quốc (5000km)</option>
+                        </select>
+
+                        {/* View Toggle */}
+                        <div className="flex bg-slate-100 p-1 rounded-xl shrink-0 ml-2">
+                            <button 
+                                onClick={() => setViewMode('grid')}
+                                className={`p-2 rounded-lg flex items-center justify-center transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                title="Xem dạng lưới"
                             >
-                                <option value={5}>5 km</option>
-                                <option value={15}>15 km</option>
-                                <option value={50}>50 km</option>
-                                <option value={5000}>Toàn quốc (5000km)</option>
-                            </select>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('map')}
+                                className={`p-2 rounded-lg flex items-center justify-center transition-all ${viewMode === 'map' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                title="Xem trên bản đồ"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+                            </button>
                         </div>
-                    )}
+                    </div>
                 </div>
 
+                {/* Grid */}
                 {loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[1, 2, 3].map(i => (
-                            <div key={i} className="bg-white rounded-xl p-5 border border-gray-200 h-64 animate-pulse flex flex-col">
-                                <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
-                                <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-                                <div className="h-4 bg-gray-200 rounded w-2/3 mb-8"></div>
-                                <div className="space-y-3 mt-auto">
-                                    <div className="h-4 bg-gray-100 rounded w-full"></div>
-                                    <div className="h-4 bg-gray-100 rounded w-5/6"></div>
-                                </div>
+                            <div key={i} className="bg-white rounded-2xl p-5 border border-slate-200/80 h-72 animate-pulse flex flex-col shadow-sm">
+                                <div className="h-6 bg-slate-200 rounded-md w-2/3 mb-4"></div>
+                                <div className="h-4 bg-slate-100 rounded-md w-full mb-2"></div>
+                                <div className="h-4 bg-slate-100 rounded-md w-1/2 mb-6"></div>
+                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 h-20 mb-4"></div>
+                                <div className="h-10 bg-slate-200 rounded-xl w-full mt-auto"></div>
                             </div>
                         ))}
                     </div>
                 ) : error ? (
-                    <div className="bg-red-50 text-red-600 p-4 rounded-lg border border-red-100">
+                    <div className="bg-rose-50 text-rose-600 p-4 rounded-xl border border-rose-100 text-center text-sm font-medium shadow-sm">
                         {error}
                     </div>
-                ) : shops.length === 0 ? (
-                    <div className="text-center py-20 bg-white rounded-xl border border-gray-200">
-                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                ) : filteredShops.length === 0 ? (
+                    <div className="text-center py-20 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+                        <svg className="mx-auto h-12 w-12 text-slate-300 stroke-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <h3 className="mt-2 text-sm font-medium text-gray-900">Không tìm thấy tiệm nào</h3>
-                        <p className="mt-1 text-sm text-gray-500">Rất tiếc không có tiệm giặt nào trong bán kính {radius}km.</p>
+                        <h3 className="mt-3 text-base font-bold text-slate-900">Không tìm thấy tiệm nào</h3>
+                        <p className="mt-1 text-sm text-slate-500">Thử thay đổi bộ lọc hoặc mở rộng bán kính tìm kiếm của bạn.</p>
                         {radius < 5000 && (
                             <button 
-                                onClick={() => setRadius(5000)}
-                                className="mt-4 text-indigo-600 hover:text-indigo-800 font-medium text-sm transition-colors"
+                                onClick={() => { setRadius(5000); setSearchQuery(''); setActiveFilter('ALL'); }}
+                                className="mt-4 px-5 py-2.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-xl text-sm font-semibold transition-colors"
                             >
-                                Bấm vào đây để tìm toàn quốc
+                                Xóa bộ lọc & Tìm toàn quốc
                             </button>
                         )}
                     </div>
+                ) : viewMode === 'map' ? (
+                    <ShopMapView shops={filteredShops} userLocation={location} />
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {shops.map(shop => (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {filteredShops.map(shop => (
                             <ShopCard key={shop.id} shop={shop} location={location} />
                         ))}
                     </div>
                 )}
             </div>
+
+            {/* Location Picker Modal */}
+            {isLocationModalOpen && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-slide-up">
+                        <div className="p-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+                            <h2 className="font-bold text-slate-900">Chọn vị trí tìm kiếm</h2>
+                            <button onClick={() => setIsLocationModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <div className="flex-1 p-4 overflow-y-auto">
+                            <p className="text-sm text-slate-500 mb-4">Di chuyển bản đồ để chọn khu vực bạn muốn tìm tiệm giặt.</p>
+                            <LocationPickerMap 
+                                initialLat={tempLat}
+                                initialLng={tempLng}
+                                onLocationChange={(lat, lng) => {
+                                    setTempLat(lat);
+                                    setTempLng(lng);
+                                }}
+                            />
+                        </div>
+                        <div className="p-4 border-t border-slate-100 shrink-0">
+                            <button
+                                onClick={() => {
+                                    if (setLocation && tempLat && tempLng) {
+                                        setLocation({ lat: tempLat, lng: tempLng });
+                                    }
+                                    setIsLocationModalOpen(false);
+                                }}
+                                className="w-full bg-teal-600 text-white font-bold py-2.5 rounded-xl hover:bg-teal-700 transition-colors"
+                            >
+                                Xác nhận vị trí
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 };

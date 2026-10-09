@@ -6,8 +6,11 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.laundry.enums.*;
 
 @Entity
 @Table(name = "orders", indexes = {
@@ -45,7 +48,7 @@ public class Order {
     private Double actualWeight;
 
     @Column(precision = 12, scale = 2)
-    private BigDecimal estimatedTotalPrice; // Giữ lại cho tương thích DTO cũ nếu cần
+    private BigDecimal estimatedTotal; 
 
     @Column(precision = 12, scale = 2)
     private BigDecimal actualTotalPrice;
@@ -57,16 +60,24 @@ public class Order {
     @Builder.Default
     private BigDecimal shippingFee = BigDecimal.ZERO;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "voucher_id")
+    private Voucher voucher;
+
+    @Column(precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
     @Column(precision = 12, scale = 2)
     private BigDecimal finalTotalPrice;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 30)
-    private InboundMethod inboundMethod;
+    private InboundType inboundType;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 30)
-    private OutboundMethod outboundMethod;
+    private OutboundType outboundType;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
@@ -85,11 +96,21 @@ public class Order {
     @Column(length = 1000)
     private String note;
 
-    @Column(length = 1000)
+    @Column(length = 500)
     private String cancelReason;
 
+    @Column(length = 20)
+    private String cancelledBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
     @Builder.Default
-    private Boolean isPaid = false;
+    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
+
+    @Column(name = "payos_order_code", unique = true)
+    private Long payosOrderCode;
+
+    private Instant paidAt;
 
     @CreationTimestamp
     @Column(updatable = false)
@@ -103,4 +124,7 @@ public class Order {
         items.add(item);
         item.setOrder(this);
     }
+    
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Review review;
 }

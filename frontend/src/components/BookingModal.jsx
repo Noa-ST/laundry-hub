@@ -1,25 +1,59 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
+import AddressBookModal from './AddressBookModal';
+import toast from 'react-hot-toast';
 
 const formatMoney = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+              Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    return R * c;
+};
 
 const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
     const { currentUser } = useAuth();
     const [quantities, setQuantities] = useState({});
+    const [contactServices, setContactServices] = useState({});
     const [bookingDate, setBookingDate] = useState(new Date().toISOString().split('T')[0]);
-    const [timeSlot, setTimeSlot] = useState("08:00:00");
+    const [timeSlot, setTimeSlot] = useState("07:00:00");
     const [note, setNote] = useState("");
     
-    const [inboundMethod, setInboundMethod] = useState('DROP_OFF');
-    const [outboundMethod, setOutboundMethod] = useState('PICKUP_AT_STORE');
+    const [inboundType, setInboundType] = useState('CUSTOMER_DROP_OFF');
+    const [outboundType, setOutboundType] = useState('CUSTOMER_PICK_UP');
     const [paymentMethod, setPaymentMethod] = useState('COD');
     
     const [receiverName, setReceiverName] = useState('');
     const [receiverPhone, setReceiverPhone] = useState('');
     const [deliveryAddress, setDeliveryAddress] = useState('');
+    const [userLat, setUserLat] = useState(location?.lat || null);
+    const [userLng, setUserLng] = useState(location?.lng || null);
+    const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+    
+    const [voucherCode, setVoucherCode] = useState('');
+    const [activeVouchers, setActiveVouchers] = useState([]);
     
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        if (shop && shop.id) {
+            axiosClient.get(`/vouchers/shop/${shop.id}`)
+                .then(res => {
+                    if (res && res.data) {
+                        setActiveVouchers(res.data);
+                    }
+                })
+                .catch(err => console.error("Error fetching vouchers", err));
+        }
+    }, [shop]);
 
     useEffect(() => {
         if (currentUser && isOpen) {
@@ -28,12 +62,19 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
         }
     }, [currentUser, isOpen]);
 
+    const currentDistance = userLat && userLng && shop?.latitude && shop?.longitude
+        ? calculateDistance(userLat, userLng, shop.latitude, shop.longitude)
+        : (shop?.distanceKm || 0);
+        
+    const maxDist = shop?.maxDeliveryDistance || 10;
+    const isFar = currentDistance > maxDist;
+
     useEffect(() => {
-        if (shop && shop.distanceKm > 10) {
-            setInboundMethod('DROP_OFF');
-            setOutboundMethod('PICKUP_AT_STORE');
+        if (isFar) {
+            setInboundType('CUSTOMER_DROP_OFF');
+            setOutboundType('CUSTOMER_PICK_UP');
         }
-    }, [shop]);
+    }, [isFar]);
 
     if (!isOpen) return null;
 
@@ -46,14 +87,27 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
         });
     };
 
-    const serviceFee = shop.services.reduce((total, s) => total + (s.price * (quantities[s.id] || 0)), 0);
-    const totalItems = Object.values(quantities).reduce((a, b) => a + b, 0);
+    const handleToggleContact = (serviceId) => {
+        setContactServices(prev => {
+            const next = { ...prev };
+            if (next[serviceId]) delete next[serviceId];
+            else next[serviceId] = 1;
+            return next;
+        });
+    };
+
+    const serviceFee = shop.services.reduce((total, s) => {
+        if (s.price === 0) return total; // Contact price
+        return total + (s.price * (quantities[s.id] || 0));
+    }, 0);
+    
+    const totalItems = Object.values(quantities).reduce((a, b) => a + b, 0) + Object.keys(contactServices).length;
     
     const singleLegFee = () => {
-        const dist = shop.distanceKm || 0;
-        if (dist > 10) return 0;
-        let baseFee = 15000;
-        let extraFee = dist > 2 ? Math.ceil(dist - 2) * 5000 : 0;
+        if (isFar) return 0;
+        let baseFee = shop.baseShippingFee || 15000;
+        let extraFeePerKm = shop.extraShippingFeePerKm || 5000;
+        let extraFee = currentDistance > 2 ? Math.ceil(currentDistance - 2) * extraFeePerKm : 0;
         return baseFee + extraFee;
     };
     
@@ -61,21 +115,39 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
     
     const calculateShippingFee = () => {
         let legs = 0;
-        if (inboundMethod === 'STORE_PICKUP') legs++;
-        if (outboundMethod === 'DELIVERY_TO_HOME') legs++;
+        if (inboundType === 'SHOP_PICK_UP') legs++;
+        if (outboundType === 'SHOP_DELIVERY') legs++;
         return calcFee * legs;
     };
     
     const shippingFee = calculateShippingFee();
-    const finalTotalPrice = serviceFee + shippingFee;
-    const hasShipping = inboundMethod === 'STORE_PICKUP' || outboundMethod === 'DELIVERY_TO_HOME';
-    const isFar = shop.distanceKm > 10;
+    const calculateDiscount = () => {
+        if (!voucherCode) return 0;
+        const matched = activeVouchers.find(v => v.code === voucherCode);
+        if (matched) {
+            if (serviceFee + shippingFee < (matched.minOrderValue || 0)) return 0;
+            if (matched.discountType === 'FIXED_AMOUNT') {
+                return matched.discountValue;
+            } else {
+                let disc = (serviceFee + shippingFee) * (matched.discountValue / 100);
+                if (matched.maxDiscountAmount && disc > matched.maxDiscountAmount) {
+                    disc = matched.maxDiscountAmount;
+                }
+                return disc;
+            }
+        }
+        return 0;
+    };
+
+    const discountAmount = calculateDiscount();
+    const finalTotalPrice = Math.max(0, serviceFee + shippingFee - discountAmount);
+    const hasShipping = inboundType === 'SHOP_PICK_UP' || outboundType === 'SHOP_DELIVERY';
     const isContactMissing = hasShipping && (!receiverName || !receiverPhone || !deliveryAddress);
 
     const getSubmitLabel = () => {
         if (totalItems === 0) return "Vui lòng chọn dịch vụ";
         if (isContactMissing) return "Vui lòng điền thông tin giao nhận";
-        return isSubmitting ? "Đang xử lý..." : "Xác nhận Đặt lịch";
+        return isSubmitting ? "Đang xử lý..." : "Xác nhận đặt đơn";
     };
 
     const isSubmitDisabled = totalItems === 0 || isContactMissing || isSubmitting;
@@ -84,9 +156,13 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
         e.preventDefault();
         if (isSubmitDisabled) return;
 
-        const items = Object.entries(quantities).map(([serviceId, qty]) => ({
-            serviceId: parseInt(serviceId), quantity: qty
-        }));
+        const items = [];
+        Object.entries(quantities).forEach(([serviceId, qty]) => {
+            items.push({ serviceId: parseInt(serviceId), quantity: qty });
+        });
+        Object.entries(contactServices).forEach(([serviceId, qty]) => {
+            items.push({ serviceId: parseInt(serviceId), quantity: qty });
+        });
 
         try {
             setIsSubmitting(true);
@@ -94,160 +170,293 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
                 shopId: shop.id,
                 bookingTime: `${bookingDate}T${timeSlot}`,
                 note, items,
-                inboundMethod, outboundMethod, paymentMethod,
+                inboundType, outboundType, paymentMethod,
                 receiverName: hasShipping ? receiverName : null,
                 receiverPhone: hasShipping ? receiverPhone : null,
                 deliveryAddress: hasShipping ? deliveryAddress : null,
-                userLat: location?.lat || null,
-                userLng: location?.lng || null
+                userLat: userLat,
+                userLng: userLng,
+                voucherCode: voucherCode || null
             });
             if (response.success) onSuccess();
-            else alert(response.message || "Có lỗi xảy ra");
+            else toast.error(response.message || "Có lỗi xảy ra");
         } catch (error) {
-            alert("Lỗi kết nối hoặc hệ thống!");
+            toast.error(error.response?.data?.message || "Lỗi kết nối hoặc hệ thống!");
         } finally { setIsSubmitting(false); }
     };
 
-    return (
+    const handleSelectAddress = (addr) => {
+        setDeliveryAddress(addr.address);
+        setUserLat(addr.latitude);
+        setUserLng(addr.longitude);
+        setIsAddressModalOpen(false);
+    };
+
+    return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl border border-slate-100 flex flex-col max-h-[88vh] overflow-hidden">
-                {/* Header cố định */}
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white z-10 shadow-sm">
-                    <h2 className="text-xl font-bold text-slate-900 truncate pr-4">Đặt lịch: {shop.name}</h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors flex-shrink-0">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-slate-100 flex flex-col max-h-[90vh] overflow-hidden animate-slide-up">
+                
+                {/* Sticky Header */}
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white z-20 shrink-0">
+                    <div className="flex flex-col">
+                        <h2 className="text-xl font-bold text-slate-900 line-clamp-1">{shop.name}</h2>
+                        <span className="text-xs font-medium text-slate-500 mt-0.5 flex items-center">
+                            <svg className="w-3.5 h-3.5 mr-1 stroke-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Cách bạn {currentDistance.toFixed(1)} km
+                        </span>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors p-2 rounded-full hover:bg-slate-100">
+                        <svg className="w-5 h-5 stroke-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
                 
-                {/* Body cuộn nội bộ */}
-                <div className="overflow-y-auto flex-1 p-5 space-y-6 bg-slate-50/50 pr-2 custom-scrollbar">
+                {/* Scrollable Body */}
+                <div className="overflow-y-auto flex-1 min-h-0 p-6 space-y-8 bg-slate-50/50 custom-scrollbar">
                     
-                    {/* Bước 1 */}
+                    {/* Phần 1: Chọn gói dịch vụ */}
                     <section>
-                        <h3 className="font-bold text-slate-900 mb-3 text-sm uppercase">1. Dịch vụ & Số lượng</h3>
-                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
-                            {shop.services.map(s => (
-                                <div key={s.id} className="flex justify-between items-center p-3 hover:bg-slate-50 transition-colors">
-                                    <div className="flex flex-col">
-                                        <span className="font-semibold text-slate-900 text-sm">{s.name}</span>
-                                        <span className="text-xs text-indigo-700 font-medium">{formatMoney(s.price)}/{s.unit}</span>
+                        <h3 className="font-bold text-slate-900 mb-4 text-[13px] uppercase tracking-wide flex items-center">
+                            <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center mr-2 text-xs">1</span>
+                            Chọn gói dịch vụ
+                        </h3>
+                        <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl overflow-hidden bg-white shadow-sm">
+                            {shop.services.map(s => {
+                                const isContact = s.price === 0;
+                                return (
+                                    <div key={s.id} className="flex justify-between items-center p-4 hover:bg-slate-50/80 transition-colors">
+                                        <div className="flex flex-col flex-1 pr-4">
+                                            <span className="font-bold text-slate-900 text-sm mb-0.5">{s.name}</span>
+                                            {isContact ? (
+                                                <span className="text-xs text-teal-700 font-bold tracking-tight bg-teal-50 px-2 py-0.5 rounded-md inline-block self-start border border-teal-100 mt-1">BÁO GIÁ SAU</span>
+                                            ) : (
+                                                <span className="text-sm font-semibold text-slate-700">{formatMoney(s.price)}<span className="text-xs text-slate-400 font-medium ml-1">/ {s.unit}</span></span>
+                                            )}
+                                        </div>
+                                        <div className="shrink-0">
+                                            {isContact ? (
+                                                <label className="flex items-center cursor-pointer gap-2 select-none group">
+                                                    <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900 transition-colors">Chọn món này</span>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={!!contactServices[s.id]}
+                                                        onChange={() => handleToggleContact(s.id)}
+                                                        className="w-5 h-5 rounded border-slate-300 text-teal-600 focus:ring-teal-600 cursor-pointer"
+                                                    />
+                                                </label>
+                                            ) : (
+                                                <div className="flex items-center space-x-1.5 bg-white rounded-xl p-1 border border-slate-200/80 shadow-sm">
+                                                    <button type="button" onClick={() => handleQtyChange(s.id, -1)} className="w-8 h-8 flex items-center justify-center text-slate-600 rounded-lg hover:bg-slate-100 transition-colors font-bold text-lg select-none">-</button>
+                                                    <span className="w-8 text-center font-bold text-slate-900 text-[15px]">{quantities[s.id] || 0}</span>
+                                                    <button type="button" onClick={() => handleQtyChange(s.id, 1)} className="w-8 h-8 flex items-center justify-center text-slate-600 rounded-lg hover:bg-slate-100 transition-colors font-bold text-lg select-none">+</button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex items-center space-x-1.5 bg-slate-50 rounded-lg p-1 border border-slate-200">
-                                        <button type="button" onClick={() => handleQtyChange(s.id, -1)} className="w-8 h-8 flex items-center justify-center bg-white text-slate-600 rounded shadow-sm hover:bg-slate-100 font-bold">-</button>
-                                        <span className="w-6 text-center font-bold text-slate-900 text-sm">{quantities[s.id] || 0}</span>
-                                        <button type="button" onClick={() => handleQtyChange(s.id, 1)} className="w-8 h-8 flex items-center justify-center bg-white text-slate-600 rounded shadow-sm hover:bg-slate-100 font-bold">+</button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </section>
 
-                    {/* Bước 2 */}
+                    {/* Phần 2: Hình thức Giao - Nhận */}
                     <section>
-                        <h3 className="font-bold text-slate-900 mb-2 text-sm uppercase">2. Ngày & Giờ Hẹn</h3>
-                        <div className="flex space-x-3">
-                            <input type="date" value={bookingDate} onChange={e=>setBookingDate(e.target.value)} required min={new Date().toISOString().split('T')[0]} className="w-1/2 border-slate-200 rounded-xl text-sm p-2.5 bg-white border shadow-sm focus:border-indigo-700 focus:ring-1 focus:ring-indigo-700 outline-none text-slate-900" />
-                            <select value={timeSlot} onChange={e=>setTimeSlot(e.target.value)} className="w-1/2 border-slate-200 rounded-xl text-sm p-2.5 bg-white border shadow-sm focus:border-indigo-700 focus:ring-1 focus:ring-indigo-700 outline-none text-slate-900">
-                                <option value="08:00:00">08:00 - 10:00</option>
-                                <option value="10:00:00">10:00 - 12:00</option>
-                                <option value="14:00:00">14:00 - 16:00</option>
-                                <option value="16:00:00">16:00 - 18:00</option>
-                            </select>
-                        </div>
-                    </section>
-
-                    {/* Bước 3 */}
-                    <section>
-                        <div className="flex justify-between items-end mb-3">
-                            <h3 className="font-bold text-slate-900 text-sm uppercase">3. Vận chuyển</h3>
-                            <span className="text-xs text-slate-500 font-medium">Khoảng cách: {shop.distanceKm || 0}km</span>
+                        <div className="flex justify-between items-end mb-4">
+                            <h3 className="font-bold text-slate-900 text-[13px] uppercase tracking-wide flex items-center">
+                                <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center mr-2 text-xs">2</span>
+                                Giao nhận đồ
+                            </h3>
                         </div>
                         
                         {isFar && (
-                            <div className="mb-3 p-3 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-sm flex items-start space-x-2">
-                                <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                                <span>Tiệm không nhận ship ngoài bán kính 10km. Vui lòng tự đến giao/nhận đồ.</span>
+                            <div className="mb-4 p-3.5 bg-rose-50 text-rose-800 rounded-xl border border-rose-200 text-sm flex items-start space-x-2">
+                                <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-rose-600 stroke-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                <span className="font-medium">Tiệm không nhận ship ngoài bán kính {maxDist}km. Vui lòng tự đến giao/nhận đồ.</span>
                             </div>
                         )}
 
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${inboundMethod === 'DROP_OFF' ? 'bg-indigo-50/50 border-slate-900' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
-                                    <div className="flex items-center space-x-2"><input type="radio" checked={inboundMethod==='DROP_OFF'} onChange={()=>setInboundMethod('DROP_OFF')} className="text-indigo-700" /><span className="font-semibold text-slate-900 text-sm">Tự mang ra tiệm</span></div>
-                                    <span className="ml-6 text-xs text-slate-500">Miễn phí</span>
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">Chiều gửi đồ (Inbound)</p>
+                                <label className={`flex flex-col p-4 border-2 rounded-2xl cursor-pointer transition-all ${inboundType === 'CUSTOMER_DROP_OFF' ? 'bg-teal-50/30 border-teal-600 shadow-sm' : 'bg-white border-slate-200 hover:border-teal-300'}`}>
+                                    <div className="flex items-center space-x-3"><input type="radio" checked={inboundType==='CUSTOMER_DROP_OFF'} onChange={()=>setInboundType('CUSTOMER_DROP_OFF')} className="w-4 h-4 text-teal-600 focus:ring-teal-600" /><span className="font-bold text-slate-900 text-[15px]">Tôi tự mang tới tiệm</span></div>
+                                    <span className="ml-7 text-xs font-medium text-slate-500 mt-1">Miễn phí</span>
                                 </label>
-                                <label className={`flex flex-col p-3 border rounded-xl transition-all ${isFar ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-slate-50'} ${inboundMethod === 'STORE_PICKUP' ? 'bg-indigo-50/50 border-slate-900' : 'bg-white border-slate-200'}`}>
-                                    <div className="flex items-center space-x-2"><input type="radio" disabled={isFar} checked={inboundMethod==='STORE_PICKUP'} onChange={()=>setInboundMethod('STORE_PICKUP')} className="text-indigo-700" /><span className="font-semibold text-slate-900 text-sm">Tiệm đến lấy đồ</span></div>
-                                    <span className="ml-6 text-xs text-indigo-700 font-medium">+{formatMoney(calcFee)}</span>
+                                <label className={`flex flex-col p-4 border-2 rounded-2xl transition-all ${isFar ? 'opacity-40 cursor-not-allowed bg-slate-50 border-slate-200' : 'cursor-pointer hover:border-teal-300'} ${inboundType === 'SHOP_PICK_UP' ? 'bg-teal-50/30 border-teal-600 shadow-sm' : 'bg-white border-slate-200'}`}>
+                                    <div className="flex items-center space-x-3"><input type="radio" disabled={isFar} checked={inboundType==='SHOP_PICK_UP'} onChange={()=>setInboundType('SHOP_PICK_UP')} className="w-4 h-4 text-teal-600 focus:ring-teal-600" /><span className="font-bold text-slate-900 text-[15px]">Shop đến lấy tận nơi</span></div>
+                                    <span className="ml-7 text-xs font-bold text-teal-700 mt-1">Phí: {formatMoney(calcFee)}</span>
                                 </label>
                             </div>
-                            <div className="space-y-2">
-                                <label className={`flex flex-col p-3 border rounded-xl cursor-pointer transition-all ${outboundMethod === 'PICKUP_AT_STORE' ? 'bg-indigo-50/50 border-slate-900' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
-                                    <div className="flex items-center space-x-2"><input type="radio" checked={outboundMethod==='PICKUP_AT_STORE'} onChange={()=>setOutboundMethod('PICKUP_AT_STORE')} className="text-indigo-700" /><span className="font-semibold text-slate-900 text-sm">Tự ra lấy đồ về</span></div>
-                                    <span className="ml-6 text-xs text-slate-500">Miễn phí</span>
+                            <div className="space-y-3">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">Chiều nhận lại (Outbound)</p>
+                                <label className={`flex flex-col p-4 border-2 rounded-2xl cursor-pointer transition-all ${outboundType === 'CUSTOMER_PICK_UP' ? 'bg-teal-50/30 border-teal-600 shadow-sm' : 'bg-white border-slate-200 hover:border-teal-300'}`}>
+                                    <div className="flex items-center space-x-3"><input type="radio" checked={outboundType==='CUSTOMER_PICK_UP'} onChange={()=>setOutboundType('CUSTOMER_PICK_UP')} className="w-4 h-4 text-teal-600 focus:ring-teal-600" /><span className="font-bold text-slate-900 text-[15px]">Tôi tự đến tiệm lấy</span></div>
+                                    <span className="ml-7 text-xs font-medium text-slate-500 mt-1">Miễn phí</span>
                                 </label>
-                                <label className={`flex flex-col p-3 border rounded-xl transition-all ${isFar ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-slate-50'} ${outboundMethod === 'DELIVERY_TO_HOME' ? 'bg-indigo-50/50 border-slate-900' : 'bg-white border-slate-200'}`}>
-                                    <div className="flex items-center space-x-2"><input type="radio" disabled={isFar} checked={outboundMethod==='DELIVERY_TO_HOME'} onChange={()=>setOutboundMethod('DELIVERY_TO_HOME')} className="text-indigo-700" /><span className="font-semibold text-slate-900 text-sm">Giao tận nhà</span></div>
-                                    <span className="ml-6 text-xs text-indigo-700 font-medium">+{formatMoney(calcFee)}</span>
+                                <label className={`flex flex-col p-4 border-2 rounded-2xl transition-all ${isFar ? 'opacity-40 cursor-not-allowed bg-slate-50 border-slate-200' : 'cursor-pointer hover:border-teal-300'} ${outboundType === 'SHOP_DELIVERY' ? 'bg-teal-50/30 border-teal-600 shadow-sm' : 'bg-white border-slate-200'}`}>
+                                    <div className="flex items-center space-x-3"><input type="radio" disabled={isFar} checked={outboundType==='SHOP_DELIVERY'} onChange={()=>setOutboundType('SHOP_DELIVERY')} className="w-4 h-4 text-teal-600 focus:ring-teal-600" /><span className="font-bold text-slate-900 text-[15px]">Shop giao tận nhà</span></div>
+                                    <span className="ml-7 text-xs font-bold text-teal-700 mt-1">Phí: {formatMoney(calcFee)}</span>
                                 </label>
+                            </div>
+                        </div>
+
+                        {hasShipping && (
+                            <div className="mt-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                <h4 className="font-bold text-slate-900 mb-3 text-[13px] uppercase">Thông tin liên hệ giao nhận</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Người nhận</label>
+                                        <input type="text" placeholder="Họ tên" value={receiverName} onChange={e=>setReceiverName(e.target.value)} className="w-full border-slate-200 rounded-xl text-sm p-3 bg-slate-50 border outline-none focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 text-slate-900 transition-all" required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Số điện thoại</label>
+                                        <input type="tel" placeholder="SĐT liên lạc" value={receiverPhone} onChange={e=>setReceiverPhone(e.target.value)} className="w-full border-slate-200 rounded-xl text-sm p-3 bg-slate-50 border outline-none focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 text-slate-900 transition-all" required />
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="flex justify-between items-end mb-1.5">
+                                        <label className="block text-xs font-semibold text-slate-600">Địa chỉ giao nhận</label>
+                                        <button type="button" onClick={() => setIsAddressModalOpen(true)} className="text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1">
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                                            Sổ địa chỉ
+                                        </button>
+                                    </div>
+                                    <input type="text" placeholder="Số nhà, tên đường, phường xã..." value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} className="w-full border-slate-200 rounded-xl text-sm p-3 bg-slate-50 border outline-none focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 text-slate-900 transition-all" required />
+                                </div>
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Phần 3: Thời gian hẹn */}
+                    <section>
+                        <h3 className="font-bold text-slate-900 mb-4 text-[13px] uppercase tracking-wide flex items-center">
+                            <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center mr-2 text-xs">3</span>
+                            Thời gian gửi/nhận
+                        </h3>
+                        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                            <div className="flex-1">
+                                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Ngày hẹn</label>
+                                <input type="date" value={bookingDate} onChange={e=>setBookingDate(e.target.value)} required min={new Date().toISOString().split('T')[0]} className="w-full border-slate-200 rounded-xl text-sm p-3 bg-white border shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 text-slate-900 transition-all" />
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Khung giờ</label>
+                                <select value={timeSlot} onChange={e=>setTimeSlot(e.target.value)} className="w-full border-slate-200 rounded-xl text-sm p-3 bg-white border shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 text-slate-900 transition-all">
+                                    <option value="07:00:00">07:00 - 09:00 (Sáng sớm)</option>
+                                    <option value="09:00:00">09:00 - 11:00 (Sáng)</option>
+                                    <option value="11:00:00">11:00 - 13:00 (Trưa)</option>
+                                    <option value="13:00:00">13:00 - 15:00 (Đầu chiều)</option>
+                                    <option value="15:00:00">15:00 - 17:00 (Cuối chiều)</option>
+                                    <option value="17:00:00">17:00 - 19:00 (Chiều tối)</option>
+                                    <option value="19:00:00">19:00 - 21:00 (Tối)</option>
+                                </select>
                             </div>
                         </div>
                     </section>
 
-                    {/* Bước 4 */}
-                    {hasShipping && (
-                        <section className="bg-indigo-50/50 p-4 rounded-xl border border-slate-200 shadow-sm">
-                            <h3 className="font-bold text-slate-900 mb-3 text-sm uppercase">4. Thông tin giao nhận</h3>
-                            <div className="grid grid-cols-2 gap-3 mb-3">
-                                <input type="text" placeholder="Họ tên" value={receiverName} onChange={e=>setReceiverName(e.target.value)} className="border-slate-200 rounded-lg text-sm p-2.5 bg-white border outline-none focus:ring-1 focus:ring-slate-900 text-slate-900" required />
-                                <input type="tel" placeholder="SĐT" value={receiverPhone} onChange={e=>setReceiverPhone(e.target.value)} className="border-slate-200 rounded-lg text-sm p-2.5 bg-white border outline-none focus:ring-1 focus:ring-slate-900 text-slate-900" required />
+                    {/* Phần 4: Ghi chú */}
+                    <section>
+                        <h3 className="font-bold text-slate-900 mb-2 text-[13px] uppercase tracking-wide flex items-center">
+                            <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center mr-2 text-xs">4</span>
+                            Ghi chú thêm (Tùy chọn)
+                        </h3>
+                        <textarea value={note} onChange={e=>setNote(e.target.value)} rows="2" placeholder="VD: Giao hàng giờ hành chính..." className="w-full border-slate-200 rounded-xl shadow-sm text-sm p-3 bg-white border focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none resize-none text-slate-900 transition-all"></textarea>
+                    </section>
+                    
+                    {/* Phần 5: Mã Giảm Giá */}
+                    <section>
+                        <h3 className="font-bold text-slate-900 mb-2 text-[13px] uppercase tracking-wide flex items-center">
+                            <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center mr-2 text-xs">5</span>
+                            Mã Giảm Giá (Tùy chọn)
+                        </h3>
+                        
+                        {activeVouchers.length > 0 && (
+                            <div className="flex gap-2 overflow-x-auto pb-3 mb-2 scrollbar-hide">
+                                {activeVouchers.map(v => (
+                                    <button
+                                        type="button"
+                                        key={v.id}
+                                        onClick={() => setVoucherCode(v.code)}
+                                        className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border ${voucherCode === v.code ? 'bg-teal-50 border-teal-500 text-teal-700 font-semibold' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+                                    >
+                                        {v.code}
+                                    </button>
+                                ))}
                             </div>
-                            <input type="text" placeholder="Địa chỉ chi tiết (VD: 123 Lê Lợi, Q1...)" value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} className="w-full border-slate-200 rounded-lg text-sm p-2.5 bg-white border outline-none focus:ring-1 focus:ring-slate-900 text-slate-900" required />
-                        </section>
-                    )}
-
-                    {/* Bước 5 */}
-                    <section>
-                        <h3 className="font-bold text-slate-900 mb-3 text-sm uppercase">5. Thanh toán</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            <label className={`flex items-center justify-center p-3 border rounded-xl cursor-pointer transition-all text-sm font-bold ${paymentMethod === 'COD' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                                <input type="radio" checked={paymentMethod === 'COD'} onChange={() => setPaymentMethod('COD')} className="hidden" />
-                                Tiền mặt (COD)
-                            </label>
-                            <label className={`flex items-center justify-center p-3 border rounded-xl cursor-pointer transition-all text-sm font-bold ${paymentMethod === 'VIETQR' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                                <input type="radio" checked={paymentMethod === 'VIETQR'} onChange={() => setPaymentMethod('VIETQR')} className="hidden" />
-                                Chuyển khoản VietQR
-                            </label>
-                        </div>
+                        )}
+                        <input
+                            type="text"
+                            value={voucherCode}
+                            onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                            placeholder="Nhập mã giảm giá..."
+                            className="w-full border-slate-200 rounded-xl shadow-sm text-sm p-3 bg-white border focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none uppercase text-slate-900 transition-all"
+                        />
+                        {voucherCode && (
+                            discountAmount > 0 ? (
+                                <p className="text-xs text-green-600 font-medium flex items-center gap-1 mt-2">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Mã hợp lệ, được giảm {formatMoney(discountAmount)}
+                                </p>
+                            ) : (
+                                <p className="text-xs text-red-500 mt-2">
+                                    Mã không hợp lệ hoặc đơn hàng chưa đủ điều kiện.
+                                </p>
+                            )
+                        )}
                     </section>
-
-                    {/* Bước 6 */}
-                    <section>
-                        <h3 className="font-bold text-slate-900 mb-2 text-sm uppercase">6. Ghi chú</h3>
-                        <textarea value={note} onChange={e=>setNote(e.target.value)} rows="2" placeholder="Ghi chú thêm cho tiệm..." className="w-full border-slate-200 rounded-xl shadow-sm text-sm p-3 bg-white border focus:ring-slate-900 outline-none resize-none text-slate-900"></textarea>
-                    </section>
+                    
+                    {/* Padding bottom so it doesn't get hidden behind the sticky footer on small screens */}
+                    <div className="h-4"></div>
                 </div>
 
-                {/* Footer cố định */}
-                <div className="p-5 border-t border-slate-200 bg-white z-10">
-                    <div className="mb-4 bg-slate-50 rounded-xl p-4 border border-slate-200 shadow-sm text-sm space-y-2">
-                        <div className="flex justify-between text-slate-600"><span className="font-medium">Tiền dịch vụ:</span> <span className="font-semibold text-slate-900">{formatMoney(serviceFee)}</span></div>
-                        <div className="flex justify-between text-slate-600"><span className="font-medium">Phí vận chuyển:</span> <span className="font-semibold text-slate-900">{formatMoney(shippingFee)}</span></div>
-                        <div className="flex justify-between items-center pt-3 border-t border-slate-200 mt-2">
-                            <span className="font-extrabold text-slate-900 uppercase">Tổng cộng:</span> 
-                            <span className="text-xl font-black text-slate-900">{formatMoney(finalTotalPrice)}</span>
+                {/* Sticky Receipt Footer */}
+                <div className="p-5 border-t border-slate-100 bg-white/95 backdrop-blur-sm z-20 shrink-0">
+                    <div className="space-y-2 mb-4">
+                        <div className="flex justify-between text-sm">
+                            <span className="font-medium text-slate-600">Tiền giặt đồ:</span> 
+                            <span className="font-bold text-slate-900">{formatMoney(serviceFee)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                            <span className="font-medium text-slate-600">Phí giao nhận:</span> 
+                            <span className="font-bold text-slate-900">{shippingFee > 0 ? formatMoney(shippingFee) : 'Miễn phí'}</span>
+                        </div>
+                        {Object.keys(contactServices).length > 0 && (
+                            <div className="flex justify-between text-sm">
+                                <span className="font-medium text-slate-600">Dịch vụ báo giá sau:</span> 
+                                <span className="font-bold text-teal-600">{Object.keys(contactServices).length} món</span>
+                            </div>
+                        )}
+                        {discountAmount > 0 && (
+                            <div className="flex justify-between text-sm">
+                                <span className="font-medium text-slate-600">Giảm giá:</span> 
+                                <span className="font-bold text-green-600">-{formatMoney(discountAmount)}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between items-end pt-3 border-t border-slate-100 mt-2">
+                            <span className="font-bold text-slate-900 uppercase text-xs">Tổng thanh toán tạm tính</span> 
+                            <span className="text-2xl font-black text-slate-900">{formatMoney(finalTotalPrice)}</span>
                         </div>
                     </div>
+                    
                     <button 
                         onClick={handleSubmit} 
                         disabled={isSubmitDisabled} 
-                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all text-[15px]"
+                        className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3.5 px-4 rounded-2xl shadow-md transition-all text-base flex items-center justify-center"
                     >
-                        {getSubmitLabel()}
+                        {isSubmitting ? (
+                            <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div> Đang xử lý...</>
+                        ) : getSubmitLabel()}
                     </button>
                 </div>
             </div>
-        </div>
+            
+            <AddressBookModal 
+                isOpen={isAddressModalOpen} 
+                onClose={() => setIsAddressModalOpen(false)} 
+                onSelectAddress={handleSelectAddress}
+            />
+        </div>,
+        document.body
     );
 };
 

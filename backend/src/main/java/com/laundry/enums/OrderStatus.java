@@ -1,0 +1,5 @@
+package com.laundry.enums;
+
+public enum OrderStatus {
+    PENDING, CONFIRMED, PICKING_UP, RECEIVED, PROCESSING, READY, DELIVERING, COMPLETED, CANCELLED
+}

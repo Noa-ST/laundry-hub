@@ -32,5 +32,5 @@ export const useCurrentLocation = () => {
         );
     }, []);
 
-    return { location, error, loading };
+    return { location, error, loading, setLocation };
 };

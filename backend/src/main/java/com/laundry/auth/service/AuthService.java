@@ -10,4 +10,5 @@ public interface AuthService {
     AuthResponseDTO getMe(Long userId);
     AuthResponseDTO refreshToken(String refreshToken);
     void logout(String refreshToken);
+    AuthResponseDTO updateAvatar(Long userId, String avatarUrl);
 }

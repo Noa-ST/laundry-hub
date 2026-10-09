@@ -4,15 +4,21 @@ import com.laundry.dto.request.CreateOrderRequestDTO;
 import com.laundry.dto.response.OrderItemResponseDTO;
 import com.laundry.dto.response.OrderResponseDTO;
 import com.laundry.entity.*;
+import com.laundry.enums.*;
 import com.laundry.repository.LaundryServiceRepository;
 import com.laundry.repository.OrderRepository;
 import com.laundry.repository.ShopRepository;
 import com.laundry.repository.UserRepository;
+import com.laundry.repository.VoucherRepository;
 import com.laundry.service.OrderService;
+import com.laundry.service.NotificationService;
 import com.laundry.util.GeoUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -22,12 +28,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
-    private static final double MAX_SHIPPING_RADIUS_KM = 10.0;
-
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final ShopRepository shopRepository;
     private final LaundryServiceRepository laundryServiceRepository;
+    private final NotificationService notificationService;
+    private final VoucherRepository voucherRepository;
 
     @Override
     @Transactional
@@ -53,9 +59,9 @@ public class OrderServiceImpl implements OrderService {
                 .bookingTime(request.bookingTime())
                 .note(request.note())
                 .status(OrderStatus.PENDING)
-                .inboundMethod(request.inboundMethod())
-                .outboundMethod(request.outboundMethod())
-                .paymentMethod(request.paymentMethod())
+                .inboundType(request.inboundType())
+                .outboundType(request.outboundType())
+                .paymentMethod(PaymentMethod.COD)
                 .receiverName(request.receiverName())
                 .receiverPhone(request.receiverPhone())
                 .deliveryAddress(request.deliveryAddress())
@@ -88,8 +94,8 @@ public class OrderServiceImpl implements OrderService {
         // Logic PhÃ­ Ship
         BigDecimal shippingFee = BigDecimal.ZERO;
         int shippingLegs = 0;
-        if (request.inboundMethod() == InboundMethod.STORE_PICKUP) shippingLegs++;
-        if (request.outboundMethod() == OutboundMethod.DELIVERY_TO_HOME) shippingLegs++;
+        if (request.inboundType() == InboundType.SHOP_PICK_UP) shippingLegs++;
+        if (request.outboundType() == OutboundType.SHOP_DELIVERY) shippingLegs++;
         
         if (shippingLegs > 0) {
             if (request.userLat() == null || request.userLng() == null) {
@@ -101,36 +107,98 @@ public class OrderServiceImpl implements OrderService {
                     shop.getLatitude(), shop.getLongitude()
             );
 
-            if (distanceKm > MAX_SHIPPING_RADIUS_KM) {
-                throw new IllegalArgumentException("Tiá»‡m chá»‰ nháº­n giao nháº­n táº­n nÆ¡i trong bÃ¡n kÃ­nh 10km.");
+            double maxDeliveryDist = shop.getMaxDeliveryDistance() != null ? shop.getMaxDeliveryDistance() : 10.0;
+            if (distanceKm > maxDeliveryDist) {
+                throw new IllegalArgumentException("Tiệm chỉ nhận giao nhận tận nơi trong bán kính " + maxDeliveryDist + "km.");
             }
 
-            shippingFee = calculateShippingFee(distanceKm, shippingLegs);
+            shippingFee = calculateShippingFee(distanceKm, shippingLegs, shop);
         }
 
-        BigDecimal finalTotalPrice = serviceFee.add(shippingFee);
+        BigDecimal preDiscountTotal = serviceFee.add(shippingFee);
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        
+        if (request.voucherCode() != null && !request.voucherCode().trim().isEmpty()) {
+            Voucher voucher = voucherRepository.findByShopIdAndCode(shop.getId(), request.voucherCode().trim().toUpperCase())
+                    .orElseThrow(() -> new IllegalArgumentException("Mã giảm giá không hợp lệ"));
+            if (!voucher.isValidForOrder(preDiscountTotal.doubleValue())) {
+                throw new IllegalArgumentException("Mã giảm giá không đủ điều kiện áp dụng");
+            }
+            if (voucher.getUsageLimitPerUser() != null) {
+                long userUsageCount = orderRepository.countByCustomerIdAndVoucherIdAndStatusNot(
+                        customer.getId(), voucher.getId(), OrderStatus.CANCELLED);
+                if (userUsageCount >= voucher.getUsageLimitPerUser()) {
+                    throw new IllegalArgumentException("Bạn đã sử dụng mã giảm giá này tối đa số lần cho phép (" + voucher.getUsageLimitPerUser() + " lần).");
+                }
+            }
+            Double discount = voucher.calculateDiscount(preDiscountTotal.doubleValue());
+            discountAmount = BigDecimal.valueOf(discount);
+            
+            order.setVoucher(voucher);
+            voucher.setUsedCount(voucher.getUsedCount() + 1);
+            voucherRepository.save(voucher);
+        }
+
+        BigDecimal finalTotalPrice = preDiscountTotal.subtract(discountAmount);
+        if (finalTotalPrice.compareTo(BigDecimal.ZERO) < 0) {
+            finalTotalPrice = BigDecimal.ZERO;
+        }
 
         order.setServiceFee(serviceFee);
         order.setShippingFee(shippingFee);
+        order.setDiscountAmount(discountAmount);
         order.setFinalTotalPrice(finalTotalPrice);
-        order.setEstimatedTotalPrice(finalTotalPrice);
+        order.setEstimatedTotal(finalTotalPrice);
         
         order = orderRepository.save(order);
+        
+        notificationService.sendNewOrderToOwners(
+            order.getShop().getOwner().getId(),
+            "Đơn hàng mới", 
+            "Khách hàng " + customer.getFullName() + " vừa đặt một đơn mới", 
+            order.getId()
+        );
+        
         return mapToDTO(order);
     }
 
-    private BigDecimal calculateShippingFee(double distanceKm, int shippingLegs) {
+    private BigDecimal calculateShippingFee(double distanceKm, int shippingLegs, Shop shop) {
         if (shippingLegs == 0) return BigDecimal.ZERO;
-        double singleLegFee = 15000.0 + Math.max(0, Math.ceil(distanceKm - 2.0)) * 5000.0;
+        double baseFee = shop.getBaseShippingFee() != null ? shop.getBaseShippingFee() : 15000.0;
+        double extraFeePerKm = shop.getExtraShippingFeePerKm() != null ? shop.getExtraShippingFeePerKm() : 5000.0;
+        
+        double singleLegFee = baseFee + Math.max(0, Math.ceil(distanceKm - 2.0)) * extraFeePerKm;
         return BigDecimal.valueOf(singleLegFee * shippingLegs);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponseDTO> getMyOrders(Long customerId) {
-        return orderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId).stream()
-                .map(this::mapToDTO)
-                .collect(Collectors.toList());
+    public Page<OrderResponseDTO> getMyOrders(Long customerId, Pageable pageable) {
+        return orderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId, pageable)
+                .map(this::mapToDTO);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponseDTO updatePaymentMethod(Long customerId, Long orderId, String method) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+        
+        if (!order.getCustomer().getId().equals(customerId)) {
+            throw new IllegalArgumentException("Bạn không có quyền cập nhật đơn hàng này");
+        }
+        
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new IllegalArgumentException("Đơn hàng đã thanh toán, không thể đổi phương thức");
+        }
+        
+        try {
+            order.setPaymentMethod(PaymentMethod.valueOf(method.toUpperCase()));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Phương thức thanh toán không hợp lệ");
+        }
+        
+        return mapToDTO(orderRepository.save(order));
     }
 
     private OrderResponseDTO mapToDTO(Order order) {
@@ -152,16 +220,23 @@ public class OrderServiceImpl implements OrderService {
                 order.getBookingTime(),
                 order.getServiceFee(),
                 order.getShippingFee(),
+                order.getDiscountAmount(),
                 order.getFinalTotalPrice(),
-                order.getEstimatedTotalPrice(),
-                order.getInboundMethod() != null ? order.getInboundMethod().name() : null,
-                order.getOutboundMethod() != null ? order.getOutboundMethod().name() : null,
+                order.getEstimatedTotal(),
+                order.getVoucher() != null ? order.getVoucher().getCode() : null,
+                order.getInboundType() != null ? order.getInboundType().name() : null,
+                order.getOutboundType() != null ? order.getOutboundType().name() : null,
                 order.getPaymentMethod() != null ? order.getPaymentMethod().name() : null,
-                order.getReceiverName(),
-                order.getReceiverPhone(),
+                order.getPaymentStatus() != null ? order.getPaymentStatus().name() : null,
+                (order.getReceiverName() != null && !order.getReceiverName().isBlank()) ? order.getReceiverName() : (order.getCustomer() != null ? order.getCustomer().getFullName() : null),
+                (order.getReceiverPhone() != null && !order.getReceiverPhone().isBlank()) ? order.getReceiverPhone() : (order.getCustomer() != null ? order.getCustomer().getPhone() : null),
                 order.getDeliveryAddress(),
                 order.getNote(),
+                order.getCancelReason(),
+                order.getCancelledBy(),
+                order.getPaidAt(),
                 order.getCreatedAt(),
+                order.getReview() != null,
                 items
         );
     }

@@ -12,6 +12,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -30,9 +33,20 @@ public class OrderController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<List<OrderResponseDTO>>> getMyOrders() {
+    public ResponseEntity<ApiResponse<Page<OrderResponseDTO>>> getMyOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         Long customerId = SecurityUtils.getCurrentUserId();
-        List<OrderResponseDTO> response = orderService.getMyOrders(customerId);
+        Pageable pageable = PageRequest.of(page, size);
+        Page<OrderResponseDTO> response = orderService.getMyOrders(customerId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PutMapping("/{id}/payment-method")
+    public ResponseEntity<ApiResponse<OrderResponseDTO>> updatePaymentMethod(
+            @PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        Long customerId = SecurityUtils.getCurrentUserId();
+        OrderResponseDTO response = orderService.updatePaymentMethod(customerId, id, body.get("method"));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

@@ -12,18 +12,25 @@ public record OrderResponseDTO(
     
     BigDecimal serviceFee,
     BigDecimal shippingFee,
+    BigDecimal discountAmount,
     BigDecimal finalTotalPrice,
-    BigDecimal estimatedTotalPrice,
+    BigDecimal estimatedTotal,
+    String voucherCode,
     
-    String inboundMethod,
-    String outboundMethod,
+    String inboundType,
+    String outboundType,
     String paymentMethod,
+    String paymentStatus,
     
     String receiverName,
     String receiverPhone,
     String deliveryAddress,
     
     String note,
+    String cancelReason,
+    String cancelledBy,
+    java.time.Instant paidAt,
     LocalDateTime createdAt,
+    boolean isReviewed,
     List<OrderItemResponseDTO> items
 ) {}

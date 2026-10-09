@@ -8,6 +8,7 @@ import com.laundry.entity.User;
 import com.laundry.repository.RefreshTokenRepository;
 import com.laundry.repository.UserRepository;
 import com.laundry.security.jwt.JwtUtils;
+import com.laundry.service.CloudinaryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -29,6 +30,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
+    private final CloudinaryService cloudinaryService;
 
     @Override
     @Transactional
@@ -59,6 +61,7 @@ public class AuthServiceImpl implements AuthService {
                 .userId(user.getId())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())
                 .build();
     }
@@ -75,6 +78,10 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByPhone(request.getPhone())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng."));
                 
+        if (user.getIsActive() != null && !user.getIsActive()) {
+            throw new IllegalArgumentException("Tài khoản của bạn đã bị khóa hoặc chưa được phê duyệt.");
+        }
+                
         RefreshToken refreshToken = createRefreshToken(user);
                 
         return AuthResponseDTO.builder()
@@ -83,6 +90,7 @@ public class AuthServiceImpl implements AuthService {
                 .userId(user.getId())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())
                 .build();
     }
@@ -98,6 +106,7 @@ public class AuthServiceImpl implements AuthService {
                 .userId(user.getId())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())
                 .build();
     }
@@ -125,6 +134,7 @@ public class AuthServiceImpl implements AuthService {
                 .userId(user.getId())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())
                 .build();
     }
@@ -148,5 +158,30 @@ public class AuthServiceImpl implements AuthService {
                 .revoked(false)
                 .build();
         return refreshTokenRepository.save(refreshToken);
+    }
+    
+    @Override
+    @Transactional
+    public AuthResponseDTO updateAvatar(Long userId, String avatarUrl) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng."));
+                
+        String oldAvatarUrl = user.getAvatarUrl();
+        user.setAvatarUrl(avatarUrl);
+        user = userRepository.save(user);
+        
+        if (oldAvatarUrl != null && !oldAvatarUrl.equals(avatarUrl)) {
+            cloudinaryService.deleteImageAsync(oldAvatarUrl);
+        }
+        
+        return AuthResponseDTO.builder()
+                .accessToken(null)
+                .refreshToken(null)
+                .userId(user.getId())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
+                .role(user.getRole())
+                .build();
     }
 }

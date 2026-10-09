@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axiosClient from '../api/axiosClient';
+import toast from 'react-hot-toast';
 
 const ManageUnitsModal = ({ isOpen, onClose }) => {
     const [units, setUnits] = useState([]);
@@ -37,7 +38,7 @@ const ManageUnitsModal = ({ isOpen, onClose }) => {
             setNewUnitName('');
             fetchUnits();
         } catch (error) {
-            alert('Lỗi thêm đơn vị');
+            toast.error('Lỗi thêm đơn vị');
         } finally {
             setIsAdding(false);
         }
@@ -49,7 +50,7 @@ const ManageUnitsModal = ({ isOpen, onClose }) => {
             await axiosClient.delete(`/owner/units/${id}`);
             fetchUnits();
         } catch (error) {
-            alert(error.response?.data?.message || 'Lỗi xóa đơn vị');
+            toast.error(error.response?.data?.message || 'Lỗi xóa đơn vị');
         }
     };
 

@@ -1,5 +1,5 @@
 package com.laundry.dto.request;
-import com.laundry.entity.OrderStatus;
+import com.laundry.enums.OrderStatus;
 import jakarta.validation.constraints.NotNull;
 
 public record UpdateOrderStatusRequestDTO(

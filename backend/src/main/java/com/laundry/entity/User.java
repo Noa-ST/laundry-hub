@@ -39,6 +39,10 @@ public class User {
     @Column(nullable = false, length = 20)
     private Role role;
 
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    @Builder.Default
+    private Boolean isActive = true;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

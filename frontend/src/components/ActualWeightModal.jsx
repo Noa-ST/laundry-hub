@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axiosClient from '../api/axiosClient';
+import toast from 'react-hot-toast';
 
 const ActualWeightModal = ({ orderId, isOpen, onClose, onSuccess }) => {
     const [weight, setWeight] = useState('');
@@ -9,7 +10,7 @@ const ActualWeightModal = ({ orderId, isOpen, onClose, onSuccess }) => {
 
     const handleSubmit = async () => {
         if (!weight || parseFloat(weight) <= 0) {
-            alert("Vui lòng nhập cân nặng hợp lệ (> 0)");
+            toast.error("Vui lòng nhập cân nặng hợp lệ (> 0)");
             return;
         }
         setIsLoading(true);
@@ -20,10 +21,10 @@ const ActualWeightModal = ({ orderId, isOpen, onClose, onSuccess }) => {
             if (res.success) {
                 onSuccess();
             } else {
-                alert(res.message);
+                toast(res.message);
             }
         } catch (error) {
-            alert("Lỗi kết nối khi cập nhật cân nặng!");
+            toast.error("Lỗi kết nối khi cập nhật cân nặng!");
         } finally {
             setIsLoading(false);
         }

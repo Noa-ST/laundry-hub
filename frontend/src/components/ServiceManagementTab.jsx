@@ -3,6 +3,7 @@ import axiosClient from '../api/axiosClient';
 import ServiceModal from './ServiceModal';
 import ManageUnitsModal from './ManageUnitsModal';
 import ManageCategoriesModal from './ManageCategoriesModal';
+import toast from 'react-hot-toast';
 
 const ServiceManagementTab = () => {
     const [services, setServices] = useState([]);
@@ -66,7 +67,7 @@ const ServiceManagementTab = () => {
             setIsServiceModalOpen(false);
             fetchServices();
         } catch (err) {
-            alert('Lỗi lưu dịch vụ. Vui lòng kiểm tra lại thông tin.');
+            toast.error('Lỗi lưu dịch vụ. Vui lòng kiểm tra lại thông tin.');
         } finally {
             setIsSavingService(false);
         }
@@ -78,7 +79,7 @@ const ServiceManagementTab = () => {
                 await axiosClient.delete(`/owner/services/${id}`);
                 fetchServices();
             } catch (err) {
-                alert('Lỗi xóa dịch vụ');
+                toast.error('Lỗi xóa dịch vụ');
             }
         }
     };

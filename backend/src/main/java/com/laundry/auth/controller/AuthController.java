@@ -4,6 +4,7 @@ import com.laundry.auth.dto.AuthResponseDTO;
 import com.laundry.auth.dto.LoginRequestDTO;
 import com.laundry.auth.dto.RefreshTokenRequestDTO;
 import com.laundry.auth.dto.RegisterRequestDTO;
+import com.laundry.dto.request.UpdateAvatarRequestDTO;
 import com.laundry.auth.service.AuthService;
 import com.laundry.dto.response.ApiResponse;
 import com.laundry.security.SecurityUtils;
@@ -35,6 +36,13 @@ public class AuthController {
         Long currentUserId = SecurityUtils.getCurrentUserId();
         AuthResponseDTO response = authService.getMe(currentUserId);
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin thành công", response));
+    }
+    
+    @PutMapping("/me/avatar")
+    public ResponseEntity<ApiResponse<AuthResponseDTO>> updateAvatar(@RequestBody UpdateAvatarRequestDTO request) {
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        AuthResponseDTO response = authService.updateAvatar(currentUserId, request.getAvatarUrl());
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh đại diện thành công", response));
     }
     
     @PostMapping("/refresh-token")

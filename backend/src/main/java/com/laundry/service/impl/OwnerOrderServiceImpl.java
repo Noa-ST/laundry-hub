@@ -1,41 +1,67 @@
 package com.laundry.service.impl;
 
-import com.laundry.dto.request.UpdateActualWeightRequestDTO;
+import com.laundry.dto.request.CreatePosOrderRequestDTO;
+import com.laundry.dto.request.InspectOrderRequestDTO;
+import com.laundry.dto.request.PosOrderItemRequestDTO;
 import com.laundry.dto.request.UpdateOrderStatusRequestDTO;
 import com.laundry.dto.response.OrderItemResponseDTO;
 import com.laundry.dto.response.OrderResponseDTO;
 import com.laundry.dto.response.OwnerOrderSummaryDTO;
-import com.laundry.entity.InboundMethod;
+import com.laundry.entity.LaundryService;
 import com.laundry.entity.Order;
 import com.laundry.entity.OrderItem;
-import com.laundry.entity.OrderStatus;
-import com.laundry.entity.OutboundMethod;
+import com.laundry.enums.InboundType;
+import com.laundry.enums.OrderStatus;
+import com.laundry.enums.OutboundType;
+import com.laundry.enums.PaymentMethod;
+import com.laundry.enums.PaymentStatus;
+import com.laundry.entity.Shop;
+import com.laundry.entity.User;
+import com.laundry.exception.BadRequestException;
+import com.laundry.repository.LaundryServiceRepository;
 import com.laundry.repository.OrderRepository;
+import com.laundry.repository.ShopRepository;
+import com.laundry.repository.UserRepository;
+import com.laundry.repository.VoucherRepository;
+import com.laundry.entity.Voucher;
 import com.laundry.service.OwnerOrderService;
+import com.laundry.service.OrderStateMachineService;
+import com.laundry.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
 public class OwnerOrderServiceImpl implements OwnerOrderService {
 
     private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
+    private final ShopRepository shopRepository;
+    private final LaundryServiceRepository laundryServiceRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final OrderStateMachineService orderStateMachineService;
+    private final NotificationService notificationService;
+    private final VoucherRepository voucherRepository;
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponseDTO> getOwnerOrders(Long ownerId, OrderStatus status) {
-        List<Order> orders;
-        if (status == null) {
-            orders = orderRepository.findByShopOwnerIdOrderByCreatedAtDesc(ownerId);
+    public Page<OrderResponseDTO> getOwnerOrders(Long ownerId, List<OrderStatus> statuses, Pageable pageable) {
+        Page<Order> orders;
+        if (statuses == null || statuses.isEmpty()) {
+            orders = orderRepository.findByShopOwnerIdOrderByCreatedAtDesc(ownerId, pageable);
         } else {
-            orders = orderRepository.findByShopOwnerIdAndStatusOrderByCreatedAtDesc(ownerId, status);
+            orders = orderRepository.findByShopOwnerIdAndStatusInOrderByCreatedAtDesc(ownerId, statuses, pageable);
         }
-        return orders.stream().map(this::mapToDTO).collect(Collectors.toList());
+        return orders.map(this::mapToDTO);
     }
 
     @Override
@@ -65,99 +91,175 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
 
     @Override
     @Transactional
-    public OrderResponseDTO updateOrderStatus(Long ownerId, Long orderId, UpdateOrderStatusRequestDTO request) {
-        Order order = getOrderAndValidateOwner(ownerId, orderId);
-        OrderStatus current = order.getStatus();
-        OrderStatus next = request.newStatus();
+    public OrderResponseDTO createPosOrder(Long ownerId, CreatePosOrderRequestDTO request) {
+        Shop shop = shopRepository.findFirstByOwnerId(ownerId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tiệm của bạn."));
 
-        if (next == OrderStatus.CANCELLED) {
-            if (current == OrderStatus.COMPLETED) {
-                throw new IllegalArgumentException("KhÃ´ng thá»ƒ há»§y Ä‘Æ¡n hÃ ng Ä‘Ã£ hoÃ n thÃ nh.");
+        User customer = userRepository.findByPhone(request.customerPhone()).orElse(null);
+
+        Order order = Order.builder()
+                .customer(customer)
+                .shop(shop)
+                .status(OrderStatus.RECEIVED)
+                .bookingTime(LocalDateTime.now())
+                .inboundType(InboundType.CUSTOMER_DROP_OFF)
+                .outboundType(OutboundType.CUSTOMER_PICK_UP)
+                .paymentMethod(PaymentMethod.COD)
+                .paymentStatus(PaymentStatus.PENDING)
+                .receiverName(request.customerName())
+                .receiverPhone(request.customerPhone())
+                .note(request.notes())
+                .shippingFee(BigDecimal.ZERO)
+                .build();
+
+        BigDecimal serviceFee = BigDecimal.ZERO;
+
+        for (PosOrderItemRequestDTO itemDto : request.items()) {
+            LaundryService service = laundryServiceRepository.findById(itemDto.serviceId())
+                    .orElseThrow(() -> new IllegalArgumentException("Dịch vụ không hợp lệ: " + itemDto.serviceId()));
+                    
+            BigDecimal unitPrice = BigDecimal.valueOf(itemDto.unitPrice());
+            BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(itemDto.quantity()));
+            
+            if (service.getMinCharge() != null && service.getMinCharge() > 0) {
+                BigDecimal minCharge = BigDecimal.valueOf(service.getMinCharge());
+                if (itemTotal.compareTo(minCharge) < 0) {
+                    itemTotal = minCharge;
+                    unitPrice = minCharge.divide(BigDecimal.valueOf(itemDto.quantity()), 2, java.math.RoundingMode.HALF_UP);
+                }
             }
-            order.setStatus(OrderStatus.CANCELLED);
-            order.setCancelReason(request.cancelReason());
-            return mapToDTO(orderRepository.save(order));
+
+            serviceFee = serviceFee.add(itemTotal);
+
+            OrderItem orderItem = OrderItem.builder()
+                    .service(service)
+                    .quantity(itemDto.quantity())
+                    .priceAtBooking(unitPrice)
+                    .build();
+                    
+            order.addItem(orderItem);
         }
 
-        validateStateTransition(current, next, order.getInboundMethod(), order.getOutboundMethod());
-        order.setStatus(next);
+        BigDecimal discountAmount = BigDecimal.ZERO;
         
-        if (next == OrderStatus.COMPLETED) {
-            order.setIsPaid(true);
+        if (request.voucherCode() != null && !request.voucherCode().trim().isEmpty()) {
+            Voucher voucher = voucherRepository.findByShopIdAndCode(shop.getId(), request.voucherCode().trim().toUpperCase())
+                    .orElseThrow(() -> new IllegalArgumentException("Mã giảm giá không hợp lệ"));
+            if (!voucher.isValidForOrder(serviceFee.doubleValue())) {
+                throw new IllegalArgumentException("Mã giảm giá không đủ điều kiện áp dụng");
+            }
+            Double discount = voucher.calculateDiscount(serviceFee.doubleValue());
+            discountAmount = BigDecimal.valueOf(discount);
+            
+            order.setVoucher(voucher);
+            voucher.setUsedCount(voucher.getUsedCount() + 1);
+            voucherRepository.save(voucher);
         }
 
-        return mapToDTO(orderRepository.save(order));
-    }
-
-    private void validateStateTransition(OrderStatus current, OrderStatus next, InboundMethod inbound, OutboundMethod outbound) {
-        boolean isValid = false;
-        switch (current) {
-            case PENDING:
-                if (next == OrderStatus.CONFIRMED) isValid = true;
-                break;
-            case CONFIRMED:
-                if (inbound == InboundMethod.STORE_PICKUP && next == OrderStatus.PICKING_UP) isValid = true;
-                if (inbound == InboundMethod.DROP_OFF && next == OrderStatus.RECEIVED) isValid = true;
-                break;
-            case PICKING_UP:
-                if (next == OrderStatus.RECEIVED) isValid = true;
-                break;
-            case RECEIVED:
-                if (next == OrderStatus.PROCESSING) isValid = true;
-                break;
-            case PROCESSING:
-                if (next == OrderStatus.READY) isValid = true;
-                break;
-            case READY:
-                if (outbound == OutboundMethod.DELIVERY_TO_HOME && next == OrderStatus.DELIVERING) isValid = true;
-                if (outbound == OutboundMethod.PICKUP_AT_STORE && next == OrderStatus.COMPLETED) isValid = true;
-                break;
-            case DELIVERING:
-                if (next == OrderStatus.COMPLETED) isValid = true;
-                break;
-            default:
-                break;
+        BigDecimal finalTotalPrice = serviceFee.subtract(discountAmount);
+        if (finalTotalPrice.compareTo(BigDecimal.ZERO) < 0) {
+            finalTotalPrice = BigDecimal.ZERO;
         }
 
-        if (!isValid) {
-            throw new IllegalArgumentException("Tráº¡ng thÃ¡i chuyá»ƒn Ä‘á»•i tá»« " + current + " sang " + next + " khÃ´ng há»£p lá»‡ vá»›i hÃ¬nh thá»©c giao nháº­n.");
-        }
+        order.setServiceFee(serviceFee);
+        order.setDiscountAmount(discountAmount);
+        order.setFinalTotalPrice(finalTotalPrice);
+        order.setEstimatedTotal(finalTotalPrice);
+        order.setActualTotalPrice(finalTotalPrice);
+
+        Order savedOrder = orderRepository.save(order);
+        return mapToDTO(savedOrder);
     }
 
     @Override
     @Transactional
-    public OrderResponseDTO updateActualWeight(Long ownerId, Long orderId, UpdateActualWeightRequestDTO request) {
+    public OrderResponseDTO updateOrderStatus(Long ownerId, Long orderId, UpdateOrderStatusRequestDTO request) {
         Order order = getOrderAndValidateOwner(ownerId, orderId);
+        orderStateMachineService.transitionTo(order, request.newStatus(), request.cancelReason(), "SHOP_OWNER");
+        Order savedOrder = orderRepository.save(order);
+        
+        // Gửi thông báo qua WebSockets cho Khách hàng
+        if (savedOrder.getCustomer() != null) {
+            String statusMsg = "Đơn hàng #" + String.format("ORD-%04d", savedOrder.getId()) + " đã chuyển sang trạng thái: " + request.newStatus();
+            notificationService.sendOrderNotification(
+                savedOrder.getCustomer().getId(),
+                "Cập nhật đơn hàng",
+                statusMsg,
+                savedOrder.getId()
+            );
+        }
+        
+        return mapToDTO(savedOrder);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponseDTO inspectOrder(Long ownerId, Long orderId, InspectOrderRequestDTO request) {
+        Order order = getOrderAndValidateOwner(ownerId, orderId);
+        
         if (order.getStatus() != OrderStatus.RECEIVED) {
-            throw new IllegalArgumentException("Chá»‰ Ä‘Æ°á»£c cáº­p nháº­t cÃ¢n náº·ng/sá»‘ lÆ°á»£ng thá»±c táº¿ khi Ä‘Æ¡n á»Ÿ tráº¡ng thÃ¡i RECEIVED.");
+            throw new BadRequestException("Chỉ được cập nhật cân nặng/số lượng thực tế (inspect) khi đơn ở trạng thái RECEIVED.");
         }
 
         order.setActualWeight(request.actualWeight());
+        if (request.notes() != null && !request.notes().trim().isEmpty()) {
+            order.setNote((order.getNote() != null ? order.getNote() + " | " : "") + request.notes());
+        }
+
+        for (var itemUpdate : request.items()) {
+            for (OrderItem item : order.getItems()) {
+                if (item.getId().equals(itemUpdate.orderItemId())) {
+                    item.setQuantity(itemUpdate.actualQuantity());
+                    if (itemUpdate.unitPrice() != null) {
+                        item.setPriceAtBooking(BigDecimal.valueOf(itemUpdate.unitPrice()));
+                    }
+                    break;
+                }
+            }
+        }
 
         BigDecimal newServiceFee = BigDecimal.ZERO;
         for (OrderItem item : order.getItems()) {
-            if (item.getService().getUnit() != null && "kg".equalsIgnoreCase(item.getService().getUnit().getName())) {
-                item.setQuantity(request.actualWeight()); 
-            }
             BigDecimal lineTotal = item.getPriceAtBooking().multiply(BigDecimal.valueOf(item.getQuantity()));
+            
+            if (item.getService().getMinCharge() != null && item.getService().getMinCharge() > 0) {
+                BigDecimal minCharge = BigDecimal.valueOf(item.getService().getMinCharge());
+                if (lineTotal.compareTo(minCharge) < 0) {
+                    lineTotal = minCharge;
+                }
+            }
+            
             newServiceFee = newServiceFee.add(lineTotal);
         }
         
+        BigDecimal discountAmount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
+        if (order.getVoucher() != null) {
+            // Recalculate discount based on new service fee + shipping fee (preDiscountTotal)
+            BigDecimal preDiscountTotal = newServiceFee.add(order.getShippingFee() != null ? order.getShippingFee() : BigDecimal.ZERO);
+            Double discount = order.getVoucher().calculateDiscount(preDiscountTotal.doubleValue());
+            discountAmount = BigDecimal.valueOf(discount);
+            order.setDiscountAmount(discountAmount);
+        }
+        
+        BigDecimal preDiscountTotal = newServiceFee.add(order.getShippingFee() != null ? order.getShippingFee() : BigDecimal.ZERO);
+        BigDecimal finalTotal = preDiscountTotal.subtract(discountAmount);
+        if (finalTotal.compareTo(BigDecimal.ZERO) < 0) {
+            finalTotal = BigDecimal.ZERO;
+        }
+        
         order.setServiceFee(newServiceFee);
-        order.setFinalTotalPrice(newServiceFee.add(order.getShippingFee()));
+        order.setFinalTotalPrice(finalTotal);
         order.setActualTotalPrice(order.getFinalTotalPrice());
         
-        order.setStatus(OrderStatus.PROCESSING); 
-
         return mapToDTO(orderRepository.save(order));
     }
 
     private Order getOrderAndValidateOwner(Long ownerId, Long orderId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("ÄÆ¡n hÃ ng khÃ´ng tá»“n táº¡i"));
+                .orElseThrow(() -> new IllegalArgumentException("Đơn hàng không tồn tại"));
         
         if (!order.getShop().getOwner().getId().equals(ownerId)) {
-            throw new IllegalArgumentException("Báº¡n khÃ´ng cÃ³ quyá»n thao tÃ¡c trÃªn Ä‘Æ¡n hÃ ng nÃ y.");
+            throw new IllegalArgumentException("Bạn không có quyền thao tác trên đơn hàng này.");
         }
         return order;
     }
@@ -181,16 +283,23 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
                 order.getBookingTime(),
                 order.getServiceFee(),
                 order.getShippingFee(),
+                order.getDiscountAmount(),
                 order.getFinalTotalPrice(),
-                order.getEstimatedTotalPrice(),
-                order.getInboundMethod() != null ? order.getInboundMethod().name() : null,
-                order.getOutboundMethod() != null ? order.getOutboundMethod().name() : null,
+                order.getEstimatedTotal(),
+                order.getVoucher() != null ? order.getVoucher().getCode() : null,
+                order.getInboundType() != null ? order.getInboundType().name() : null,
+                order.getOutboundType() != null ? order.getOutboundType().name() : null,
                 order.getPaymentMethod() != null ? order.getPaymentMethod().name() : null,
-                order.getReceiverName(),
-                order.getReceiverPhone(),
+                order.getPaymentStatus() != null ? order.getPaymentStatus().name() : null,
+                (order.getReceiverName() != null && !order.getReceiverName().isBlank()) ? order.getReceiverName() : (order.getCustomer() != null ? order.getCustomer().getFullName() : null),
+                (order.getReceiverPhone() != null && !order.getReceiverPhone().isBlank()) ? order.getReceiverPhone() : (order.getCustomer() != null ? order.getCustomer().getPhone() : null),
                 order.getDeliveryAddress(),
                 order.getNote(),
+                order.getCancelReason(),
+                order.getCancelledBy(),
+                order.getPaidAt(),
                 order.getCreatedAt(),
+                order.getReview() != null,
                 items
         );
     }

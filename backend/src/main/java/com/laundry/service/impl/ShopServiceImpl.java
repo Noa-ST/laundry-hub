@@ -15,6 +15,7 @@ import com.laundry.repository.ServiceUnitRepository;
 import com.laundry.repository.ShopRepository;
 import com.laundry.repository.UserRepository;
 import com.laundry.service.ShopService;
+import com.laundry.service.CloudinaryService;
 import com.laundry.util.GeoUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ public class ShopServiceImpl implements ShopService {
     private final UserRepository userRepository;
     private final ServiceCategoryRepository serviceCategoryRepository;
     private final ServiceUnitRepository serviceUnitRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Override
     public List<ShopResponseDTO> findNearbyShops(Double lat, Double lng, Double radius) {
@@ -47,6 +49,7 @@ public class ShopServiceImpl implements ShopService {
                 })
                 .filter(swd -> swd.distance() <= radius)
                 .sorted((a, b) -> a.distance().compareTo(b.distance()))
+                .limit(20)
                 .collect(Collectors.toList());
 
         List<Long> shopIds = nearbyShops.stream()
@@ -75,10 +78,17 @@ public class ShopServiceImpl implements ShopService {
                             swd.shop().getLongitude(),
                             roundedDistance,
                             swd.shop().getPhone(),
+                            swd.shop().getCoverImage(),
+                            swd.shop().getGalleryImages(),
                             swd.shop().getOperatingHours(),
                             swd.shop().getTotalWashers(),
                             swd.shop().getTotalDryers(),
                             swd.shop().getIsActive(),
+                            swd.shop().getRating(),
+                            swd.shop().getReviewCount(),
+                            swd.shop().getBaseShippingFee(),
+                            swd.shop().getExtraShippingFeePerKm(),
+                            swd.shop().getMaxDeliveryDistance(),
                             servicesByShop.getOrDefault(swd.shop().getId(), List.of())
                     );
                 })
@@ -101,10 +111,17 @@ public class ShopServiceImpl implements ShopService {
                             shop.getLongitude(),
                             0.0, // distanceKm
                             shop.getPhone(),
+                            shop.getCoverImage(),
+                            shop.getGalleryImages(),
                             shop.getOperatingHours(),
                             shop.getTotalWashers(),
                             shop.getTotalDryers(),
                             shop.getIsActive(),
+                            shop.getRating(),
+                            shop.getReviewCount(),
+                            shop.getBaseShippingFee(),
+                            shop.getExtraShippingFeePerKm(),
+                            shop.getMaxDeliveryDistance(),
                             serviceDTOs
                     );
                 })
@@ -128,9 +145,14 @@ public class ShopServiceImpl implements ShopService {
                 .latitude(request.latitude())
                 .longitude(request.longitude())
                 .phone(request.phone())
+                .coverImage(request.coverImage())
+                .galleryImages(request.galleryImages() != null ? request.galleryImages() : new java.util.ArrayList<>())
                 .operatingHours(request.operatingHours())
                 .totalWashers(request.totalWashers())
                 .totalDryers(request.totalDryers())
+                .baseShippingFee(request.baseShippingFee() != null ? request.baseShippingFee() : 15000.0)
+                .extraShippingFeePerKm(request.extraShippingFeePerKm() != null ? request.extraShippingFeePerKm() : 5000.0)
+                .maxDeliveryDistance(request.maxDeliveryDistance() != null ? request.maxDeliveryDistance() : 10.0)
                 .isActive(true)
                 .build();
 
@@ -181,10 +203,17 @@ public class ShopServiceImpl implements ShopService {
                 savedShop.getLongitude(),
                 0.0,
                 savedShop.getPhone(),
+                savedShop.getCoverImage(),
+                savedShop.getGalleryImages(),
                 savedShop.getOperatingHours(),
                 savedShop.getTotalWashers(),
                 savedShop.getTotalDryers(),
                 savedShop.getIsActive(),
+                savedShop.getRating(),
+                savedShop.getReviewCount(),
+                savedShop.getBaseShippingFee(),
+                savedShop.getExtraShippingFeePerKm(),
+                savedShop.getMaxDeliveryDistance(),
                 serviceDTOs
         );
     }
@@ -195,20 +224,41 @@ public class ShopServiceImpl implements ShopService {
         Shop shop = shopRepository.findFirstByOwnerId(ownerId)
                 .orElseThrow(() -> new IllegalArgumentException("KhÃ´ng tÃ¬m tháº¥y tiá»‡m cá»§a báº¡n."));
 
+        String oldCoverImage = shop.getCoverImage();
+        List<String> oldGalleryImages = shop.getGalleryImages() != null ? new java.util.ArrayList<>(shop.getGalleryImages()) : new java.util.ArrayList<>();
+
         shop.setName(request.name());
         shop.setAddress(request.address());
         shop.setLatitude(request.latitude());
         shop.setLongitude(request.longitude());
         shop.setPhone(request.phone());
+        shop.setCoverImage(request.coverImage());
+        if (request.galleryImages() != null) {
+            shop.setGalleryImages(request.galleryImages());
+        }
         shop.setOperatingHours(request.operatingHours());
         shop.setTotalWashers(request.totalWashers());
         shop.setTotalDryers(request.totalDryers());
+        
+        if (request.baseShippingFee() != null) shop.setBaseShippingFee(request.baseShippingFee());
+        if (request.extraShippingFeePerKm() != null) shop.setExtraShippingFeePerKm(request.extraShippingFeePerKm());
+        if (request.maxDeliveryDistance() != null) shop.setMaxDeliveryDistance(request.maxDeliveryDistance());
         
         if (request.isActive() != null) {
             shop.setIsActive(request.isActive());
         }
 
         Shop savedShop = shopRepository.save(shop);
+
+        if (oldCoverImage != null && !oldCoverImage.equals(savedShop.getCoverImage())) {
+            cloudinaryService.deleteImageAsync(oldCoverImage);
+        }
+        if (savedShop.getGalleryImages() != null) {
+            oldGalleryImages.removeAll(savedShop.getGalleryImages());
+        }
+        for (String url : oldGalleryImages) {
+            cloudinaryService.deleteImageAsync(url);
+        }
 
         List<LaundryService> services = laundryServiceRepository.findByShopId(savedShop.getId());
         List<ServiceDTO> serviceDTOs = services.stream()
@@ -223,10 +273,17 @@ public class ShopServiceImpl implements ShopService {
                 savedShop.getLongitude(),
                 0.0,
                 savedShop.getPhone(),
+                savedShop.getCoverImage(),
+                savedShop.getGalleryImages(),
                 savedShop.getOperatingHours(),
                 savedShop.getTotalWashers(),
                 savedShop.getTotalDryers(),
                 savedShop.getIsActive(),
+                savedShop.getRating(),
+                savedShop.getReviewCount(),
+                savedShop.getBaseShippingFee(),
+                savedShop.getExtraShippingFeePerKm(),
+                savedShop.getMaxDeliveryDistance(),
                 serviceDTOs
         );
     }

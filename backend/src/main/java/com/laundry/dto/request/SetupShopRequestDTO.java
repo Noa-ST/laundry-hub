@@ -22,6 +22,11 @@ public record SetupShopRequestDTO(
     @NotBlank(message = "Số điện thoại tiệm không được để trống") 
     String phone,
     
+    @NotBlank(message = "Ảnh bìa tiệm (Cover Image) không được để trống")
+    String coverImage,
+    
+    List<String> galleryImages,
+    
     String operatingHours,
     
     @Min(value = 1, message = "Cần tối thiểu 1 máy giặt") 
@@ -30,6 +35,10 @@ public record SetupShopRequestDTO(
     @Min(value = 0, message = "Sá»‘ mÃ¡y sáº¥y khÃ´ng há»£p lá»‡") 
     int totalDryers,
     
+    Double baseShippingFee,
+    Double extraShippingFeePerKm,
+    Double maxDeliveryDistance,
+
     List<ServiceSetupDTO> services
 ) {
     public record ServiceSetupDTO(
