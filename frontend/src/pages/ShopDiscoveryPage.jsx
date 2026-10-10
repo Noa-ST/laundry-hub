@@ -12,7 +12,9 @@ const ShopDiscoveryPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [radius, setRadius] = useState(15);
-    const [activeFilter, setActiveFilter] = useState('ALL');
+    const [selectedCategory, setSelectedCategory] = useState('ALL');
+    const [sortBy, setSortBy] = useState('distance');
+    const [minRating, setMinRating] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState('grid');
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
@@ -39,14 +41,50 @@ const ShopDiscoveryPage = () => {
         fetchShops();
     }, [location, radius]);
 
+    // Helper to check if shop has a specific service category
+    const hasServiceCategory = (shop, category) => {
+        if (!shop.services || shop.services.length === 0) return false;
+        
+        const keywords = {
+            'BASIC': ['cơ bản', 'quần áo', 'giặt sấy', 'lấy liền'],
+            'PREMIUM': ['hấp', 'veston', 'cao cấp'],
+            'SHOES': ['giày', 'sneaker'],
+            'BEDDING': ['gấu bông', 'chăn', 'ga', 'mền']
+        };
+        
+        if (!keywords[category]) return true;
+        
+        return shop.services.some(service => {
+            const name = service.name.toLowerCase();
+            return keywords[category].some(kw => name.includes(kw));
+        });
+    };
+
     // Client-side filtering
-    const filteredShops = shops.filter(shop => {
+    let filteredShops = shops.filter(shop => {
         const matchSearch = shop.name.toLowerCase().includes(searchQuery.toLowerCase()) || (shop.address && shop.address.toLowerCase().includes(searchQuery.toLowerCase()));
-        let matchFilter = true;
-        if (activeFilter === 'OPEN') matchFilter = shop.isActive;
-        if (activeFilter === 'DELIVERY') matchFilter = shop.maxDeliveryDistance > 0;
-        if (activeFilter === 'PREMIUM') matchFilter = shop.rating >= 4.8; // Example premium criteria
-        return matchSearch && matchFilter;
+        
+        const matchRating = (shop.rating || 0) >= minRating;
+        
+        let matchCategory = true;
+        if (selectedCategory !== 'ALL') {
+            matchCategory = hasServiceCategory(shop, selectedCategory);
+        }
+        
+        return matchSearch && matchRating && matchCategory;
+    });
+
+    // Client-side sorting
+    filteredShops.sort((a, b) => {
+        if (sortBy === 'rating') {
+            return (b.rating || 0) - (a.rating || 0);
+        } else if (sortBy === 'price') {
+            const minA = a.services?.length > 0 ? Math.min(...a.services.map(s => s.price)) : 9999999;
+            const minB = b.services?.length > 0 ? Math.min(...b.services.map(s => s.price)) : 9999999;
+            return minA - minB;
+        } else {
+            return (a.distanceKm || 0) - (b.distanceKm || 0);
+        }
     });
 
     return (
@@ -101,76 +139,106 @@ const ShopDiscoveryPage = () => {
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20">
                 {/* Search & Filters Card */}
-                <div className="bg-white rounded-2xl shadow-md border border-slate-200/60 p-4 md:p-6 mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 md:p-5 mb-8 flex flex-col gap-4">
                     
-                    {/* Search Bar */}
-                    <div className="relative w-full md:w-1/3 shrink-0">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
+                    {/* Top Row: Search & Core Filters */}
+                    <div className="flex flex-col md:flex-row gap-4 items-center justify-between w-full">
+                        {/* Search Bar */}
+                        <div className="relative w-full md:flex-1 max-w-lg">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Tên tiệm, địa chỉ..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all"
+                            />
                         </div>
-                        <input
-                            type="text"
-                            placeholder="Tên tiệm, địa chỉ..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all"
-                        />
+
+                        {/* Right side controls */}
+                        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto shrink-0 justify-start md:justify-end">
+                            {/* Sort Dropdown */}
+                            <select 
+                                value={sortBy} 
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold px-3 py-2.5 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all cursor-pointer"
+                            >
+                                <option value="distance">Gần tôi nhất</option>
+                                <option value="rating">Đánh giá cao nhất</option>
+                                <option value="price">Giá thấp nhất</option>
+                            </select>
+
+                            {/* Radius Dropdown */}
+                            <select 
+                                value={radius} 
+                                onChange={(e) => setRadius(Number(e.target.value))}
+                                className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold px-3 py-2.5 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all cursor-pointer"
+                            >
+                                <option value={5}>Dưới 5 km</option>
+                                <option value={15}>Dưới 15 km</option>
+                                <option value={50}>Dưới 50 km</option>
+                                <option value={5000}>Toàn quốc (5000km)</option>
+                            </select>
+
+                            {/* View Toggle */}
+                            <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
+                                <button 
+                                    onClick={() => setViewMode('grid')}
+                                    className={`p-1.5 rounded-lg flex items-center justify-center transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                    title="Xem dạng lưới"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                                </button>
+                                <button 
+                                    onClick={() => setViewMode('map')}
+                                    className={`p-1.5 rounded-lg flex items-center justify-center transition-all ${viewMode === 'map' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                    title="Xem trên bản đồ"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Filter Chips */}
-                    <div className="flex overflow-x-auto custom-scrollbar gap-2 w-full md:w-auto pb-2 md:pb-0">
-                        {[
-                            { id: 'ALL', label: 'Tất cả' },
-                            { id: 'OPEN', label: 'Đang mở cửa' },
-                            { id: 'DELIVERY', label: 'Có lấy tận nơi' },
-                            { id: 'PREMIUM', label: 'Tiệm nổi bật' }
-                        ].map(filter => (
-                            <button 
-                                key={filter.id}
-                                onClick={() => setActiveFilter(filter.id)}
-                                className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                                    activeFilter === filter.id 
-                                    ? 'bg-teal-600 text-white border-teal-600 shadow-sm' 
-                                    : 'bg-white text-slate-600 border-slate-200 hover:border-teal-500/30 hover:bg-teal-50'
-                                }`}
-                            >
-                                {filter.label}
-                            </button>
-                        ))}
-                    </div>
-                    
-                    {/* Radius Dropdown */}
-                    <div className="flex items-center space-x-2 shrink-0">
-                        <select 
-                            value={radius} 
-                            onChange={(e) => setRadius(Number(e.target.value))}
-                            className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all cursor-pointer"
+                    {/* Bottom Row: Categories & Rating Filter */}
+                    <div className="flex flex-col md:flex-row gap-4 items-center justify-between pt-3 border-t border-slate-100">
+                        {/* Filter Chips - Categories */}
+                        <div className="flex overflow-x-auto scrollbar-hide gap-2 w-full md:flex-1 pb-1">
+                            {[
+                                { id: 'ALL', label: 'Tất cả dịch vụ' },
+                                { id: 'BASIC', label: 'Giặt sấy cơ bản' },
+                                { id: 'PREMIUM', label: 'Giặt hấp / Veston' },
+                                { id: 'SHOES', label: 'Vệ sinh Giày' },
+                                { id: 'BEDDING', label: 'Chăn ga / Gấu bông' }
+                            ].map(cat => (
+                                <button 
+                                    key={cat.id}
+                                    onClick={() => setSelectedCategory(cat.id)}
+                                    className={`whitespace-nowrap px-4 py-2 rounded-full text-[13px] font-semibold transition-all border shrink-0 ${
+                                        selectedCategory === cat.id 
+                                        ? 'bg-teal-600 text-white border-teal-600 shadow-sm' 
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-teal-500/30 hover:bg-teal-50'
+                                    }`}
+                                >
+                                    {cat.label}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {/* Rating Filter */}
+                        <button 
+                            onClick={() => setMinRating(minRating === 4 ? 0 : 4)}
+                            className={`shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-semibold transition-all border ${
+                                minRating === 4 ? 'bg-amber-50 text-amber-700 border-amber-300 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-amber-50/50 hover:border-amber-200'
+                            }`}
                         >
-                            <option value={5}>Dưới 5 km</option>
-                            <option value={15}>Dưới 15 km</option>
-                            <option value={50}>Dưới 50 km</option>
-                            <option value={5000}>Toàn quốc (5000km)</option>
-                        </select>
-
-                        {/* View Toggle */}
-                        <div className="flex bg-slate-100 p-1 rounded-xl shrink-0 ml-2">
-                            <button 
-                                onClick={() => setViewMode('grid')}
-                                className={`p-2 rounded-lg flex items-center justify-center transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}
-                                title="Xem dạng lưới"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                            </button>
-                            <button 
-                                onClick={() => setViewMode('map')}
-                                className={`p-2 rounded-lg flex items-center justify-center transition-all ${viewMode === 'map' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}
-                                title="Xem trên bản đồ"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
-                            </button>
-                        </div>
+                            <svg className={`w-4 h-4 ${minRating === 4 ? 'text-amber-500' : 'text-slate-400'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                            Chỉ tiệm uy tín (≥ 4 Sao)
+                        </button>
                     </div>
                 </div>
 
