@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import BookingModal from './BookingModal';
 import ShopReviewsModal from './ShopReviewsModal';
 import { useAuth } from '../context/AuthContext';

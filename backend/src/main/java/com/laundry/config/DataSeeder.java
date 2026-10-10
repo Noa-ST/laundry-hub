@@ -25,7 +25,15 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
-        // Kiểm tra xem đã seed chưa để tránh chạy lại nhiều lần
+        // Fix ratings to 0
+        List<Shop> allShops = shopRepository.findAll();
+        for(Shop s : allShops) {
+            s.setRating(0.0);
+            s.setReviewCount(0);
+        }
+        shopRepository.saveAll(allShops);
+        System.out.println("RESET ALL RATINGS TO 0!");
+
         if (userRepository.findByEmail("shop1@gmail.com").isPresent()) {
             System.out.println("40 Shops already seeded!");
             return;
