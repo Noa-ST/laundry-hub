@@ -13,7 +13,7 @@ import java.util.List;
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://laundryhub.vercel.app}")
+    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://laundry-hub-six.vercel.app,https://*.vercel.app,https://laundryhub.vercel.app}")
     private List<String> allowedOrigins;
 
     @Override
@@ -25,7 +25,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOrigins(allowedOrigins.toArray(new String[0]))
+                .setAllowedOriginPatterns(allowedOrigins.toArray(new String[0]))
                 .withSockJS();
     }
 }
