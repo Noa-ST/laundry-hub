@@ -40,7 +40,6 @@ const ChatModal = ({ isOpen, onClose, orderId, orderCode, shopName, customerName
     useEffect(() => {
         if (!isOpen || !orderId || !connected || !stompClient) return;
 
-        console.log("Subscribing to chat topic for order:", orderId);
         const subscription = stompClient.subscribe(`/topic/chat/${orderId}`, (message) => {
             if (message.body) {
                 const newMsg = JSON.parse(message.body);

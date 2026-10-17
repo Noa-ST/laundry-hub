@@ -40,7 +40,7 @@ public class ReviewService {
         Order order = orderRepository.findById(request.getOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
                 
-        if (!order.getCustomer().getId().equals(customerId)) {
+        if (order.getCustomer() == null || !order.getCustomer().getId().equals(customerId)) {
             throw new IllegalArgumentException("Không thể đánh giá đơn hàng của người khác");
         }
         if (!order.getShop().getId().equals(shopId)) {

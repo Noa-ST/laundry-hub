@@ -5,6 +5,7 @@ import com.laundry.dto.response.statistics.StatisticsResponseDTO.*;
 import com.laundry.entity.Order;
 import com.laundry.entity.OrderItem;
 import com.laundry.enums.OrderStatus;
+import com.laundry.enums.PaymentMethod;
 import com.laundry.enums.PaymentStatus;
 import com.laundry.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
@@ -115,6 +116,7 @@ public class StatisticsService {
 
         // Revenue Trend
         Map<String, Double> trendMap = new LinkedHashMap<>();
+        Map<String, Integer> trendCountMap = new LinkedHashMap<>();
         DateTimeFormatter dayFormatter = DateTimeFormatter.ofPattern("dd/MM");
         DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("MM/yyyy");
 
@@ -124,13 +126,17 @@ public class StatisticsService {
         if (isYearly) {
             LocalDate temp = startDate.toLocalDate();
             while (!temp.isAfter(endDate.toLocalDate())) {
-                trendMap.put(temp.format(monthFormatter), 0.0);
+                String key = temp.format(monthFormatter);
+                trendMap.put(key, 0.0);
+                trendCountMap.put(key, 0);
                 temp = temp.plusMonths(1);
             }
         } else {
             LocalDate temp = startDate.toLocalDate();
             while (!temp.isAfter(endDate.toLocalDate())) {
-                trendMap.put(temp.format(dayFormatter), 0.0);
+                String key = temp.format(dayFormatter);
+                trendMap.put(key, 0.0);
+                trendCountMap.put(key, 0);
                 temp = temp.plusDays(1);
             }
         }
@@ -140,11 +146,12 @@ public class StatisticsService {
                 String label = isYearly ? o.getCreatedAt().format(monthFormatter) : o.getCreatedAt().format(dayFormatter);
                 double val = o.getFinalTotalPrice() != null ? o.getFinalTotalPrice().doubleValue() : 0;
                 trendMap.put(label, trendMap.getOrDefault(label, 0.0) + val);
+                trendCountMap.put(label, trendCountMap.getOrDefault(label, 0) + 1);
             }
         }
 
         List<RevenuePointDTO> trend = trendMap.entrySet().stream()
-                .map(e -> new RevenuePointDTO(e.getKey(), e.getValue()))
+                .map(e -> new RevenuePointDTO(e.getKey(), e.getValue(), trendCountMap.getOrDefault(e.getKey(), 0)))
                 .collect(Collectors.toList());
 
         // Top Services & Categories
@@ -181,6 +188,7 @@ public class StatisticsService {
         int customerDropOff = 0, shopPickUp = 0;
         int customerPickUp = 0, shopDelivery = 0;
         int cash = 0, vietQr = 0;
+        double cashRevenue = 0, vietQrRevenue = 0;
 
         for (Order o : currentOrders) {
             if (o.getInboundType() != null) {
@@ -192,8 +200,21 @@ public class StatisticsService {
                 if (o.getOutboundType().name().equals("SHOP_DELIVERY")) shopDelivery++;
             }
             if (o.getPaymentMethod() != null) {
-                if (o.getPaymentMethod().name().equals("CASH")) cash++;
-                if (o.getPaymentMethod().name().equals("VIETQR")) vietQr++;
+                boolean isCash = o.getPaymentMethod() == PaymentMethod.COD || "CASH".equalsIgnoreCase(o.getPaymentMethod().name());
+                boolean isVietQr = o.getPaymentMethod() == PaymentMethod.VIETQR;
+                double val = o.getFinalTotalPrice() != null ? o.getFinalTotalPrice().doubleValue() : 0;
+
+                if (isCash) {
+                    cash++;
+                    if (o.getPaymentStatus() == PaymentStatus.PAID) {
+                        cashRevenue += val;
+                    }
+                } else if (isVietQr) {
+                    vietQr++;
+                    if (o.getPaymentStatus() == PaymentStatus.PAID) {
+                        vietQrRevenue += val;
+                    }
+                }
             }
         }
 
@@ -202,7 +223,7 @@ public class StatisticsService {
         // But since we use customerId anyway, let's just make up a stat based on receiverName presence (POS usually fills receiverName directly)
         int pos = 0, app = 0;
         for (Order o : currentOrders) {
-            if (o.getReceiverName() != null && !o.getReceiverName().trim().isEmpty() && !o.getCustomer().getFullName().equals(o.getReceiverName())) {
+            if (o.getCustomer() == null || (o.getReceiverName() != null && !o.getReceiverName().trim().isEmpty() && !o.getCustomer().getFullName().equals(o.getReceiverName()))) {
                 pos++;
             } else {
                 app++;
@@ -212,7 +233,7 @@ public class StatisticsService {
         OperationalBreakdownDTO breakdown = new OperationalBreakdownDTO(
                 new OperationalBreakdownDTO.ChannelBreakdown(app, pos),
                 new OperationalBreakdownDTO.DeliveryBreakdown(customerDropOff, shopPickUp, customerPickUp, shopDelivery),
-                new OperationalBreakdownDTO.PaymentBreakdown(cash, vietQr)
+                new OperationalBreakdownDTO.PaymentBreakdown(cash, vietQr, cashRevenue, vietQrRevenue)
         );
 
         return new StatisticsResponseDTO(kpis, trend, topServices, categoryRevenue, breakdown);

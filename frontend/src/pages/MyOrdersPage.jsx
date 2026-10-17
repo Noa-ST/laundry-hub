@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axiosClient from '../api/axiosClient';
 import PaymentQrModal from '../components/PaymentQrModal';
 import ReviewModal from '../components/ReviewModal';
+import DisputeModal from '../components/DisputeModal';
 import ChatModal from '../components/ChatModal';
 import { useWebSocket } from '../context/WebSocketContext';
 import toast from 'react-hot-toast';
@@ -113,6 +114,7 @@ const MyOrdersPage = () => {
     const [qrOrder, setQrOrder] = useState(null);
     const [isCancelling, setIsCancelling] = useState(false);
     const [reviewOrder, setReviewOrder] = useState(null);
+    const [disputeOrder, setDisputeOrder] = useState(null);
     const [chatOrder, setChatOrder] = useState(null);
     
     const { notification } = useWebSocket();
@@ -275,9 +277,18 @@ const MyOrdersPage = () => {
                                                     <span className="text-xs font-bold text-slate-900">{order.outboundType === 'SHOP_DELIVERY' ? 'Giao tận nhà' : 'Khách ra tiệm lấy'}</span>
                                                 </div>
                                                 {(order.inboundType === 'SHOP_PICK_UP' || order.outboundType === 'SHOP_DELIVERY') && (
-                                                    <div className="pt-1">
-                                                        <p className="font-bold text-slate-900 text-xs mb-1">{order.receiverName} <span className="font-normal text-slate-400 mx-1">•</span> {order.receiverPhone}</p>
-                                                        <p className="text-slate-600 text-[11px] line-clamp-2 leading-relaxed">{order.deliveryAddress}</p>
+                                                    <div className="pt-1 space-y-1">
+                                                        <p className="font-bold text-slate-900 text-xs">{order.receiverName} <span className="font-normal text-slate-400 mx-1">•</span> {order.receiverPhone}</p>
+                                                        {order.inboundType === 'SHOP_PICK_UP' && (
+                                                            <p className="text-slate-600 text-[11px] line-clamp-2 leading-relaxed">
+                                                                <span className="font-semibold text-slate-700">📍 Lấy đồ:</span> {order.pickupAddress || order.deliveryAddress}
+                                                            </p>
+                                                        )}
+                                                        {order.outboundType === 'SHOP_DELIVERY' && (
+                                                            <p className="text-slate-600 text-[11px] line-clamp-2 leading-relaxed">
+                                                                <span className="font-semibold text-slate-700">📦 Trả đồ:</span> {order.deliveryAddress}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -376,6 +387,28 @@ const MyOrdersPage = () => {
                                                 Đánh giá
                                             </button>
                                         )}
+                                        {order.status === 'COMPLETED' && (
+                                            order.hasDispute ? (
+                                                <button 
+                                                    onClick={() => setDisputeOrder(order)}
+                                                    className="text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-300 px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-sm"
+                                                >
+                                                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                                    Xem khiếu nại
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => setDisputeOrder(order)}
+                                                    className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 px-3.5 py-2 rounded-lg transition-all flex items-center gap-1"
+                                                    title="Báo cáo thiếu đồ, rách/hỏng hoặc vấn đề giặt ủi"
+                                                >
+                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                    </svg>
+                                                    Báo lỗi / Khiếu nại
+                                                </button>
+                                            )
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -409,6 +442,13 @@ const MyOrdersPage = () => {
                 onClose={() => setReviewOrder(null)}
                 order={reviewOrder}
                 onSuccess={handleReviewSuccess}
+            />
+
+            <DisputeModal 
+                isOpen={!!disputeOrder}
+                onClose={() => setDisputeOrder(null)}
+                order={disputeOrder}
+                onSuccess={() => fetchOrders(page)}
             />
 
             {chatOrder && (

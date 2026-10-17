@@ -9,6 +9,7 @@ import com.laundry.repository.ShopRepository;
 import com.laundry.repository.VoucherRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -87,13 +88,15 @@ public class VoucherService {
         return mapToDTO(voucherRepository.save(voucher));
     }
 
+    @Transactional
     public void deleteVoucher(Long ownerId, Long voucherId) {
         Shop shop = shopRepository.findFirstByOwnerId(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shop not found"));
         Voucher voucher = voucherRepository.findByIdAndShopId(voucherId, shop.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Voucher not found"));
         
-        voucherRepository.delete(voucher);
+        voucher.setIsActive(false);
+        voucherRepository.save(voucher);
     }
 
     private VoucherResponseDTO mapToDTO(Voucher v) {
@@ -110,7 +113,8 @@ public class VoucherService {
                 v.getUsageLimitPerUser(),
                 v.getUsedCount(),
                 v.getIsActive(),
-                v.getCreatedAt()
+                v.getCreatedAt(),
+                v.getTargetUser() != null ? v.getTargetUser().getId() : null
         );
     }
 }

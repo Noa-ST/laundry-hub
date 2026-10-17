@@ -15,5 +15,6 @@ public record VoucherResponseDTO(
     Integer usageLimitPerUser,
     Integer usedCount,
     Boolean isActive,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    Long targetUserId
 ) {}

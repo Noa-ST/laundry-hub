@@ -110,18 +110,36 @@ const StatisticsTab = () => {
 
             {/* B. Revenue Trend Chart */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                <h3 className="text-sm font-bold text-slate-800 mb-4">Biểu đồ Doanh Thu</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 className="text-sm font-bold text-slate-800">Biểu đồ Doanh Thu</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">Theo dõi doanh thu thực nhận và số lượng đơn hàng theo thời gian</p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                        <span className="flex items-center gap-1.5 text-slate-600">
+                            <span className="w-2.5 h-2.5 rounded-full bg-teal-600"></span>
+                            Doanh thu (VNĐ)
+                        </span>
+                    </div>
+                </div>
                 <div className="h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={revenueTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <AreaChart data={revenueTrend} margin={{ top: 10, right: 20, left: 5, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#0d9488" stopOpacity={0.3}/>
                                     <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#cbd5e1" opacity={0.6} />
+                            <XAxis 
+                                dataKey="label" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 12, fill: '#64748b' }} 
+                                dy={10} 
+                                padding={{ left: 16, right: 16 }}
+                            />
                             <YAxis 
                                 axisLine={false} 
                                 tickLine={false} 
@@ -130,8 +148,28 @@ const StatisticsTab = () => {
                                 dx={-10}
                             />
                             <Tooltip 
-                                formatter={(value) => [`${formatMoney(value)} đ`, 'Doanh thu']}
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                content={({ active, payload, label }) => {
+                                    if (active && payload && payload.length) {
+                                        const item = payload[0].payload;
+                                        return (
+                                            <div className="bg-slate-900/95 text-white p-3.5 rounded-xl shadow-xl text-xs space-y-1.5 border border-slate-700 min-w-[170px] backdrop-blur-sm animate-fade-in">
+                                                <div className="text-[11px] font-bold text-slate-300 border-b border-slate-700/80 pb-1 flex items-center justify-between">
+                                                    <span>Mốc ngày</span>
+                                                    <span className="font-mono text-white">{label}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-slate-200 pt-0.5">
+                                                    <span>Doanh thu:</span>
+                                                    <span className="font-extrabold text-teal-400">{formatMoney(item.revenue)} đ</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-slate-200">
+                                                    <span>Số đơn:</span>
+                                                    <span className="font-bold text-amber-300">{item.orderCount || 0} đơn</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                }}
                             />
                             <Area type="monotone" dataKey="revenue" stroke="#0d9488" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
                         </AreaChart>
@@ -214,7 +252,7 @@ const StatisticsTab = () => {
                                 <span className="text-sm font-bold text-slate-900">{operationalBreakdown.channel.pos}</span>
                             </div>
                             <div className="w-full bg-slate-200 rounded-full h-1.5">
-                                <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${(operationalBreakdown.channel.pos / (operationalBreakdown.channel.app + operationalBreakdown.channel.pos || 1)) * 100}%` }}></div>
+                                <div className="bg-slate-900 h-1.5 rounded-full" style={{ width: `${(operationalBreakdown.channel.pos / (operationalBreakdown.channel.app + operationalBreakdown.channel.pos || 1)) * 100}%` }}></div>
                             </div>
                         </div>
 
@@ -242,19 +280,80 @@ const StatisticsTab = () => {
                         </div>
 
                         {/* Payment */}
-                        <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center items-center">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 w-full text-left">Phương thức thanh toán</h4>
-                            <div className="flex gap-4 w-full">
-                                <div className="flex-1 bg-white p-3 rounded-lg border border-slate-200 text-center shadow-sm">
-                                    <div className="text-2xl font-black text-amber-500">{operationalBreakdown.payment.cash}</div>
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase mt-1">Tiền mặt</div>
+                        {(() => {
+                            const cashRev = operationalBreakdown?.payment?.cashRevenue || 0;
+                            const vietQrRev = operationalBreakdown?.payment?.vietQrRevenue || 0;
+                            const totalPaymentRev = cashRev + vietQrRev;
+                            const cashCount = operationalBreakdown?.payment?.cash || 0;
+                            const vietQrCount = operationalBreakdown?.payment?.vietQr || 0;
+                            const totalPaymentCount = cashCount + vietQrCount;
+
+                            let cashPct = 0;
+                            let vietQrPct = 0;
+                            if (totalPaymentRev > 0) {
+                                cashPct = Math.round((cashRev / totalPaymentRev) * 100);
+                                vietQrPct = 100 - cashPct;
+                            } else if (totalPaymentCount > 0) {
+                                cashPct = Math.round((cashCount / totalPaymentCount) * 100);
+                                vietQrPct = 100 - cashPct;
+                            }
+
+                            return (
+                                <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 flex flex-col justify-between">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Phương thức thanh toán</h4>
+                                        <span className="text-[11px] font-semibold text-slate-400">
+                                            Tổng: {formatMoney(totalPaymentRev)} đ
+                                        </span>
+                                    </div>
+
+                                    {/* Progress Bar */}
+                                    <div className="w-full bg-slate-200/80 rounded-full h-2.5 overflow-hidden flex mb-3 shadow-inner">
+                                        <div 
+                                            className="bg-amber-500 h-full transition-all duration-500" 
+                                            style={{ width: `${cashPct}%` }}
+                                            title={`Tiền mặt: ${cashPct}%`}
+                                        ></div>
+                                        <div 
+                                            className="bg-indigo-600 h-full transition-all duration-500" 
+                                            style={{ width: `${vietQrPct}%` }}
+                                            title={`VietQR: ${vietQrPct}%`}
+                                        ></div>
+                                    </div>
+
+                                    {/* Badges */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-xs">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
+                                                <span className="text-xs font-bold text-slate-700">Tiền mặt:</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-black text-slate-900">{formatMoney(cashRev)} đ</span>
+                                                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">
+                                                    {cashPct}%
+                                                </span>
+                                                <span className="text-[11px] text-slate-400 font-medium">({cashCount} đơn)</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-xs">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0"></span>
+                                                <span className="text-xs font-bold text-slate-700">VietQR:</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-black text-slate-900">{formatMoney(vietQrRev)} đ</span>
+                                                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-md">
+                                                    {vietQrPct}%
+                                                </span>
+                                                <span className="text-[11px] text-slate-400 font-medium">({vietQrCount} đơn)</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex-1 bg-white p-3 rounded-lg border border-slate-200 text-center shadow-sm">
-                                    <div className="text-2xl font-black text-indigo-500">{operationalBreakdown.payment.vietQr}</div>
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase mt-1">VietQR</div>
-                                </div>
-                            </div>
-                        </div>
+                            );
+                        })()}
 
                     </div>
                 </div>

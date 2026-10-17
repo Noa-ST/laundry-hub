@@ -27,6 +27,10 @@ public class Voucher {
     @JoinColumn(name = "shop_id", nullable = false)
     private Shop shop;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "target_user_id")
+    private User targetUser;
+
     @Column(nullable = false, length = 50)
     private String code;
 

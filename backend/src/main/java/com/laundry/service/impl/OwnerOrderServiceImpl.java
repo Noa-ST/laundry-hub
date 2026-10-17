@@ -10,6 +10,7 @@ import com.laundry.dto.response.OwnerOrderSummaryDTO;
 import com.laundry.entity.LaundryService;
 import com.laundry.entity.Order;
 import com.laundry.entity.OrderItem;
+import com.laundry.entity.PriceType;
 import com.laundry.enums.InboundType;
 import com.laundry.enums.OrderStatus;
 import com.laundry.enums.OutboundType;
@@ -27,6 +28,9 @@ import com.laundry.entity.Voucher;
 import com.laundry.service.OwnerOrderService;
 import com.laundry.service.OrderStateMachineService;
 import com.laundry.service.NotificationService;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -97,6 +101,11 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
 
         User customer = userRepository.findByPhone(request.customerPhone()).orElse(null);
 
+        PaymentMethod pm = request.paymentMethod() != null ? request.paymentMethod() : PaymentMethod.COD;
+        boolean paid = request.isPaid() != null ? request.isPaid() : true;
+        PaymentStatus ps = paid ? PaymentStatus.PAID : PaymentStatus.PENDING;
+        Instant paidTime = paid ? Instant.now() : null;
+
         Order order = Order.builder()
                 .customer(customer)
                 .shop(shop)
@@ -104,8 +113,9 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
                 .bookingTime(LocalDateTime.now())
                 .inboundType(InboundType.CUSTOMER_DROP_OFF)
                 .outboundType(OutboundType.CUSTOMER_PICK_UP)
-                .paymentMethod(PaymentMethod.COD)
-                .paymentStatus(PaymentStatus.PENDING)
+                .paymentMethod(pm)
+                .paymentStatus(ps)
+                .paidAt(paidTime)
                 .receiverName(request.customerName())
                 .receiverPhone(request.customerPhone())
                 .note(request.notes())
@@ -176,20 +186,47 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
     public OrderResponseDTO updateOrderStatus(Long ownerId, Long orderId, UpdateOrderStatusRequestDTO request) {
         Order order = getOrderAndValidateOwner(ownerId, orderId);
         orderStateMachineService.transitionTo(order, request.newStatus(), request.cancelReason(), "SHOP_OWNER");
+
+        if (request.newStatus() == OrderStatus.CANCELLED && order.getVoucher() != null) {
+            Voucher voucher = order.getVoucher();
+            if (voucher.getUsedCount() != null && voucher.getUsedCount() > 0) {
+                voucher.setUsedCount(voucher.getUsedCount() - 1);
+                voucherRepository.save(voucher);
+            }
+        }
+
         Order savedOrder = orderRepository.save(order);
         
-        // Gửi thông báo qua WebSockets cho Khách hàng
+        // Gửi thông báo qua WebSockets cho Khách hàng (nội dung tiếng Việt tự nhiên, không lộ enum)
         if (savedOrder.getCustomer() != null) {
-            String statusMsg = "Đơn hàng #" + String.format("ORD-%04d", savedOrder.getId()) + " đã chuyển sang trạng thái: " + request.newStatus();
+            OrderStatus newStatus = request.newStatus();
             notificationService.sendOrderNotification(
                 savedOrder.getCustomer().getId(),
-                "Cập nhật đơn hàng",
-                statusMsg,
+                newStatus.getNotificationTitle(),
+                buildStatusMessage(savedOrder, newStatus, request.cancelReason()),
                 savedOrder.getId()
             );
         }
         
         return mapToDTO(savedOrder);
+    }
+
+    /**
+     * Sinh câu thông báo thân thiện cho khách theo trạng thái mới.
+     */
+    private String buildStatusMessage(Order order, OrderStatus status, String cancelReason) {
+        String orderCode = "#" + String.format("ORD-%04d", order.getId());
+        boolean isShopDelivery = order.getOutboundType() == OutboundType.SHOP_DELIVERY;
+
+        return switch (status) {
+            case READY -> isShopDelivery
+                    ? "Đơn hàng " + orderCode + " đã giặt xong và sẽ sớm được giao đến bạn."
+                    : "Đơn hàng " + orderCode + " đã giặt xong. Mời bạn ghé tiệm nhận đồ.";
+            case CANCELLED -> (cancelReason != null && !cancelReason.isBlank())
+                    ? status.formatNotificationMessage(orderCode) + " Lý do: " + cancelReason.trim()
+                    : status.formatNotificationMessage(orderCode);
+            default -> status.formatNotificationMessage(orderCode);
+        };
     }
 
     @Override
@@ -209,9 +246,15 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
         for (var itemUpdate : request.items()) {
             for (OrderItem item : order.getItems()) {
                 if (item.getId().equals(itemUpdate.orderItemId())) {
-                    item.setQuantity(itemUpdate.actualQuantity());
-                    if (itemUpdate.unitPrice() != null) {
-                        item.setPriceAtBooking(BigDecimal.valueOf(itemUpdate.unitPrice()));
+                    if (itemUpdate.actualQuantity() != null && itemUpdate.actualQuantity() >= 0) {
+                        item.setQuantity(itemUpdate.actualQuantity());
+                    }
+                    if (itemUpdate.unitPrice() != null && itemUpdate.unitPrice() > 0) {
+                        // Với dịch vụ định giá sau (CONTACT), cập nhật đơn giá theo báo giá thực tế
+                        // Với dịch vụ FIXED, bảo vệ quyền lợi khách: giữ nguyên giá niêm yết của dịch vụ
+                        if (item.getService().getPriceType() == PriceType.CONTACT || item.getPriceAtBooking() == null || item.getPriceAtBooking().compareTo(BigDecimal.ZERO) == 0) {
+                            item.setPriceAtBooking(BigDecimal.valueOf(itemUpdate.unitPrice()));
+                        }
                     }
                     break;
                 }
@@ -294,12 +337,14 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
                 (order.getReceiverName() != null && !order.getReceiverName().isBlank()) ? order.getReceiverName() : (order.getCustomer() != null ? order.getCustomer().getFullName() : null),
                 (order.getReceiverPhone() != null && !order.getReceiverPhone().isBlank()) ? order.getReceiverPhone() : (order.getCustomer() != null ? order.getCustomer().getPhone() : null),
                 order.getDeliveryAddress(),
+                order.getPickupAddress(),
                 order.getNote(),
                 order.getCancelReason(),
                 order.getCancelledBy(),
                 order.getPaidAt(),
                 order.getCreatedAt(),
                 order.getReview() != null,
+                order.isHasDispute(),
                 items
         );
     }

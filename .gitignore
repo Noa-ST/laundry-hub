@@ -1,9 +1,9 @@
 # =========================
 # 1. TÀI LIỆU & BỘ NHỚ AI
 # =========================
-# Khóa toàn bộ các file Markdown, thư mục báo cáo và dữ liệu AI
 *.md
-.ai/
+!README.md
+!AGENTS.md
 docs/
 
 # =========================

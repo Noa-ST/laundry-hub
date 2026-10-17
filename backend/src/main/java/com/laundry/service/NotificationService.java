@@ -71,8 +71,8 @@ public class NotificationService {
         payload.put("isRead", notification.isRead());
         payload.put("timestamp", System.currentTimeMillis());
 
-        // Gửi tới đường dẫn chung: /topic/owner/notifications
-        messagingTemplate.convertAndSend("/topic/owner/notifications", payload);
+        // Gửi tới đường dẫn riêng của chủ tiệm nhận đơn
+        messagingTemplate.convertAndSend("/topic/user/" + ownerId + "/notifications", payload);
     }
 
     public Page<NotificationDTO> getUserNotifications(Long userId, Pageable pageable) {

@@ -49,7 +49,7 @@ public class ShopServiceImpl implements ShopService {
                 })
                 .filter(swd -> swd.distance() <= radius)
                 .sorted((a, b) -> a.distance().compareTo(b.distance()))
-                .limit(20)
+                .limit(100)
                 .collect(Collectors.toList());
 
         List<Long> shopIds = nearbyShops.stream()

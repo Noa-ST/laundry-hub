@@ -18,8 +18,9 @@ export const AuthProvider = ({ children }) => {
         }
         try {
             const response = await axiosClient.get('/auth/me');
-            if (response.success) {
-                setCurrentUser(response.data);
+            if (response.success && response.data) {
+                const userData = { ...response.data, id: response.data.userId ?? response.data.id, userId: response.data.userId ?? response.data.id };
+                setCurrentUser(userData);
             } else {
                 localStorage.removeItem('access_token');
                 setCurrentUser(null);
@@ -46,9 +47,10 @@ export const AuthProvider = ({ children }) => {
     const login = async (phone, password) => {
         try {
             const response = await axiosClient.post('/auth/login', { phone, password });
-            if (response.success) {
+            if (response.success && response.data) {
                 localStorage.setItem('access_token', response.data.accessToken);
-                setCurrentUser(response.data);
+                const userData = { ...response.data, id: response.data.userId ?? response.data.id, userId: response.data.userId ?? response.data.id };
+                setCurrentUser(userData);
                 return { success: true };
             }
             return { success: false, message: response.message || 'Đăng nhập thất bại' };
@@ -63,9 +65,10 @@ export const AuthProvider = ({ children }) => {
     const register = async (data) => {
         try {
             const response = await axiosClient.post('/auth/register', data);
-            if (response.success) {
+            if (response.success && response.data) {
                 localStorage.setItem('access_token', response.data.accessToken);
-                setCurrentUser(response.data);
+                const userData = { ...response.data, id: response.data.userId ?? response.data.id, userId: response.data.userId ?? response.data.id };
+                setCurrentUser(userData);
                 return { success: true };
             }
             return { success: false, message: response.message || 'Đăng ký thất bại' };

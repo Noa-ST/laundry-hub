@@ -9,12 +9,15 @@ import NotificationBell from './components/NotificationBell';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
+import SupportChatWidget from './components/SupportChatWidget';
 import { Toaster } from 'react-hot-toast';
 
 const OwnerRoute = () => {
     return (
         <div className="relative min-h-screen bg-slate-50">
             <OwnerDashboardPage />
+            <SupportChatWidget />
+            <Toaster position="top-center" />
         </div>
     );
 };
@@ -36,6 +39,8 @@ function App() {
         }
         setCurrentTab(hash);
     };
+
+    handleHashChange();
 
     const handleAuthRequired = () => {
         setAuthTab('login');
@@ -60,12 +65,17 @@ function App() {
   }
 
   // Redirect Logic for Shop Owner and Admin
-  if (isAuthenticated && currentUser.role === 'SHOP_OWNER') {
+  if (isAuthenticated && currentUser?.role === 'SHOP_OWNER') {
       return <OwnerRoute />;
   }
 
-  if (isAuthenticated && currentUser.role === 'ADMIN') {
-      return <AdminDashboardPage />;
+  if (isAuthenticated && currentUser?.role === 'ADMIN') {
+      return (
+          <>
+              <AdminDashboardPage />
+              <Toaster position="top-center" />
+          </>
+      );
   }
 
   // Public/Customer View
@@ -142,6 +152,7 @@ function App() {
           onClose={() => setIsAuthModalOpen(false)} 
           defaultTab={authTab}
       />
+      <SupportChatWidget />
       <Toaster position="top-center" />
     </div>
   );

@@ -3,6 +3,13 @@ import { useAuth } from '../context/AuthContext';
 import AddressBookModal from './AddressBookModal';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
+import InitialsAvatar from './InitialsAvatar';
+
+const ROLE_LABELS = {
+    CUSTOMER: 'Khách hàng',
+    SHOP_OWNER: 'Chủ tiệm',
+    ADMIN: 'Quản trị viên',
+};
 
 function UserProfile() {
     const { currentUser, logout, loadUser } = useAuth();
@@ -23,6 +30,16 @@ function UserProfile() {
     const handleAvatarChange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            toast.error('Vui lòng chọn tệp tin hình ảnh hợp lệ');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Kích thước ảnh không được vượt quá 5MB');
+            return;
+        }
 
         try {
             const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
@@ -56,16 +73,10 @@ function UserProfile() {
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex items-center space-x-3 bg-white hover:bg-gray-50 border border-gray-200 p-1.5 pr-4 rounded-full shadow-sm"
             >
-                <div className="w-9 h-9 rounded-full bg-indigo-100 border border-indigo-200 overflow-hidden flex-shrink-0">
-                    <img 
-                        src={currentUser.avatarUrl || ("https://api.dicebear.com/7.x/avataaars/svg?seed=" + currentUser.fullName)} 
-                        alt="Avatar" 
-                        className="w-full h-full object-cover"
-                    />
-                </div>
+                <InitialsAvatar name={currentUser.fullName} src={currentUser.avatarUrl} size="md" />
                 <div className="text-left hidden sm:block max-w-[120px] md:max-w-[150px]">
                     <p className="text-sm font-semibold text-gray-800 leading-tight truncate">{currentUser.fullName}</p>
-                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider truncate">{currentUser.role}</p>
+                    <p className="text-[10px] font-bold text-teal-700 uppercase tracking-wider truncate">{ROLE_LABELS[currentUser.role] || currentUser.role}</p>
                 </div>
                 <svg className={`w-4 h-4 shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -76,13 +87,12 @@ function UserProfile() {
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden py-1">
                     <div className="px-4 py-4 border-b border-gray-50 bg-gray-50/50 flex flex-col items-center justify-center">
                         <div className="relative group mb-3">
-                            <div className="w-16 h-16 rounded-full bg-indigo-100 border-2 border-white shadow-sm overflow-hidden flex-shrink-0">
-                                <img 
-                                    src={currentUser.avatarUrl || ("https://api.dicebear.com/7.x/avataaars/svg?seed=" + currentUser.fullName)} 
-                                    alt="Avatar" 
-                                    className="w-full h-full object-cover"
-                                />
-                            </div>
+                            <InitialsAvatar
+                                name={currentUser.fullName}
+                                src={currentUser.avatarUrl}
+                                size="xl"
+                                className="border-2 border-white shadow-sm"
+                            />
                             <label className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                 <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />

@@ -61,10 +61,12 @@ public class OrderServiceImpl implements OrderService {
                 .status(OrderStatus.PENDING)
                 .inboundType(request.inboundType())
                 .outboundType(request.outboundType())
-                .paymentMethod(PaymentMethod.COD)
+                .paymentMethod(request.paymentMethod() != null ? request.paymentMethod() : PaymentMethod.COD)
                 .receiverName(request.receiverName())
                 .receiverPhone(request.receiverPhone())
-                .deliveryAddress(request.deliveryAddress())
+                .deliveryAddress(request.outboundType() == OutboundType.SHOP_DELIVERY || request.pickupAddress() == null
+                        ? request.deliveryAddress() : null)
+                .pickupAddress(request.inboundType() == InboundType.SHOP_PICK_UP ? request.pickupAddress() : null)
                 .build();
 
         BigDecimal serviceFee = BigDecimal.ZERO;
@@ -102,17 +104,34 @@ public class OrderServiceImpl implements OrderService {
                 throw new IllegalArgumentException("KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c vá»‹ trÃ­ giao nháº­n.");
             }
 
-            double distanceKm = GeoUtils.calculateDistance(
-                    request.userLat(), request.userLng(),
-                    shop.getLatitude(), shop.getLongitude()
-            );
-
             double maxDeliveryDist = shop.getMaxDeliveryDistance() != null ? shop.getMaxDeliveryDistance() : 10.0;
-            if (distanceKm > maxDeliveryDist) {
-                throw new IllegalArgumentException("Tiệm chỉ nhận giao nhận tận nơi trong bán kính " + maxDeliveryDist + "km.");
+
+            // Chiều gửi đồ: Shop đến lấy tại địa chỉ nhận đồ (fallback về userLat/userLng cho client cũ)
+            if (request.inboundType() == InboundType.SHOP_PICK_UP) {
+                boolean hasPickupCoords = request.pickupLat() != null && request.pickupLng() != null;
+                double pickupLat = hasPickupCoords ? request.pickupLat() : request.userLat();
+                double pickupLng = hasPickupCoords ? request.pickupLng() : request.userLng();
+                double pickupDistanceKm = GeoUtils.calculateDistance(
+                        pickupLat, pickupLng,
+                        shop.getLatitude(), shop.getLongitude()
+                );
+                if (pickupDistanceKm > maxDeliveryDist) {
+                    throw new IllegalArgumentException("Địa chỉ nhận đồ nằm ngoài bán kính phục vụ " + maxDeliveryDist + "km của tiệm.");
+                }
+                shippingFee = shippingFee.add(calculateShippingFee(pickupDistanceKm, 1, shop));
             }
 
-            shippingFee = calculateShippingFee(distanceKm, shippingLegs, shop);
+            // Chiều trả đồ: Shop giao về địa chỉ trả đồ (userLat/userLng)
+            if (request.outboundType() == OutboundType.SHOP_DELIVERY) {
+                double deliveryDistanceKm = GeoUtils.calculateDistance(
+                        request.userLat(), request.userLng(),
+                        shop.getLatitude(), shop.getLongitude()
+                );
+                if (deliveryDistanceKm > maxDeliveryDist) {
+                    throw new IllegalArgumentException("Địa chỉ trả đồ nằm ngoài bán kính phục vụ " + maxDeliveryDist + "km của tiệm.");
+                }
+                shippingFee = shippingFee.add(calculateShippingFee(deliveryDistanceKm, 1, shop));
+            }
         }
 
         BigDecimal preDiscountTotal = serviceFee.add(shippingFee);
@@ -121,6 +140,9 @@ public class OrderServiceImpl implements OrderService {
         if (request.voucherCode() != null && !request.voucherCode().trim().isEmpty()) {
             Voucher voucher = voucherRepository.findByShopIdAndCode(shop.getId(), request.voucherCode().trim().toUpperCase())
                     .orElseThrow(() -> new IllegalArgumentException("Mã giảm giá không hợp lệ"));
+            if (voucher.getTargetUser() != null && !voucher.getTargetUser().getId().equals(customer.getId())) {
+                throw new IllegalArgumentException("Mã giảm giá này dành riêng cho khách hàng khác và không thể áp dụng cho tài khoản của bạn.");
+            }
             if (!voucher.isValidForOrder(preDiscountTotal.doubleValue())) {
                 throw new IllegalArgumentException("Mã giảm giá không đủ điều kiện áp dụng");
             }
@@ -231,12 +253,14 @@ public class OrderServiceImpl implements OrderService {
                 (order.getReceiverName() != null && !order.getReceiverName().isBlank()) ? order.getReceiverName() : (order.getCustomer() != null ? order.getCustomer().getFullName() : null),
                 (order.getReceiverPhone() != null && !order.getReceiverPhone().isBlank()) ? order.getReceiverPhone() : (order.getCustomer() != null ? order.getCustomer().getPhone() : null),
                 order.getDeliveryAddress(),
+                order.getPickupAddress(),
                 order.getNote(),
                 order.getCancelReason(),
                 order.getCancelledBy(),
                 order.getPaidAt(),
                 order.getCreatedAt(),
                 order.getReview() != null,
+                order.isHasDispute(),
                 items
         );
     }

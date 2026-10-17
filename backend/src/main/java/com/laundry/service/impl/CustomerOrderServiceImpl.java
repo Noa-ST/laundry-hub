@@ -21,6 +21,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     private final OrderRepository orderRepository;
     private final OrderStateMachineService orderStateMachineService;
+    private final com.laundry.repository.VoucherRepository voucherRepository;
 
     @Override
     @Transactional
@@ -28,7 +29,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Đơn hàng không tồn tại."));
         
-        if (!order.getCustomer().getId().equals(customerId)) {
+        if (order.getCustomer() == null || !order.getCustomer().getId().equals(customerId)) {
             throw new BadRequestException("Bạn không có quyền thao tác trên đơn hàng này.");
         }
 
@@ -37,6 +38,14 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         }
 
         orderStateMachineService.transitionTo(order, OrderStatus.CANCELLED, "Khách hàng tự hủy", "CUSTOMER");
+
+        if (order.getVoucher() != null) {
+            com.laundry.entity.Voucher voucher = order.getVoucher();
+            if (voucher.getUsedCount() != null && voucher.getUsedCount() > 0) {
+                voucher.setUsedCount(voucher.getUsedCount() - 1);
+                voucherRepository.save(voucher);
+            }
+        }
         
         return mapToDTO(orderRepository.save(order));
     }
@@ -71,12 +80,14 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 (order.getReceiverName() != null && !order.getReceiverName().isBlank()) ? order.getReceiverName() : (order.getCustomer() != null ? order.getCustomer().getFullName() : null),
                 (order.getReceiverPhone() != null && !order.getReceiverPhone().isBlank()) ? order.getReceiverPhone() : (order.getCustomer() != null ? order.getCustomer().getPhone() : null),
                 order.getDeliveryAddress(),
+                order.getPickupAddress(),
                 order.getNote(),
                 order.getCancelReason(),
                 order.getCancelledBy(),
                 order.getPaidAt(),
                 order.getCreatedAt(),
                 order.getReview() != null,
+                order.isHasDispute(),
                 items
         );
     }

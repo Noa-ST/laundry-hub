@@ -3,6 +3,7 @@ package com.laundry.config;
 import com.laundry.entity.*;
 import com.laundry.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Random;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
@@ -32,10 +34,38 @@ public class DataSeeder implements CommandLineRunner {
             s.setReviewCount(0);
         }
         shopRepository.saveAll(allShops);
-        System.out.println("RESET ALL RATINGS TO 0!");
+        log.info("Reset all shop ratings to 0.");
+
+        // Seed Admin user (sdt: 023456789, mat khau: Nora@2004)
+        String adminPhone = "023456789";
+        User admin = userRepository.findByPhone(adminPhone).orElse(null);
+        if (admin == null) {
+            String adminEmail = "admin@laundryhub.com";
+            if (userRepository.findByEmail(adminEmail).isPresent()) {
+                adminEmail = "admin." + adminPhone + "@laundryhub.com";
+            }
+            admin = User.builder()
+                    .fullName("Quản Trị Viên (Admin)")
+                    .email(adminEmail)
+                    .phone(adminPhone)
+                    .password(passwordEncoder.encode("Nora@2004"))
+                    .role(Role.ADMIN)
+                    .isActive(true)
+                    .avatarUrl("https://ui-avatars.com/api/?name=Admin&background=4F46E5&color=fff")
+                    .build();
+            userRepository.save(admin);
+            log.info("Admin account seeded successfully.");
+        } else {
+            admin.setFullName("Quản Trị Viên (Admin)");
+            admin.setPassword(passwordEncoder.encode("Nora@2004"));
+            admin.setRole(Role.ADMIN);
+            admin.setIsActive(true);
+            userRepository.save(admin);
+            log.info("Admin account updated successfully.");
+        }
 
         if (userRepository.findByEmail("shop1@gmail.com").isPresent()) {
-            System.out.println("40 Shops already seeded!");
+            log.info("Initial shops already seeded.");
             return;
         }
 
@@ -43,7 +73,7 @@ public class DataSeeder implements CommandLineRunner {
         String[] shopNames = {"Sạch Sẽ", "Thơm Tho", "Express", "Siêu Tốc", "Tiện Lợi", "Gia Đình", "Chuyên Nghiệp", "Quy Nhơn", "Gia Lai Mới", "24/7", "Sinh Viên", "Hoàn Hảo"};
         String[] streets = {"Lê Hồng Phong", "Nguyễn Thái Học", "Trần Hưng Đạo", "Tây Sơn", "An Dương Vương", "Nguyễn Tất Thành", "Vũ Bảo", "Diên Hồng", "Ngô Mây", "Hoàng Văn Thụ"};
 
-        System.out.println("BẮT ĐẦU SEEDING 40 SHOPS VÀ DỊCH VỤ...");
+        log.info("Starting shop and service data seeding...");
 
         for (int i = 1; i <= 40; i++) {
             // 1. Tạo User (Chủ shop)
@@ -114,6 +144,6 @@ public class DataSeeder implements CommandLineRunner {
             laundryServiceRepository.save(LaundryService.builder().shop(shop).name("Giặt Gấu bông (Size M)").category(catGauBong).unit(unitCai).priceType(PriceType.FIXED).price(50000.0 + random.nextInt(2) * 10000).isActive(true).description("Giặt sạch sâu, ướp hương nước hoa nhẹ nhàng.").build());
         }
 
-        System.out.println("DATA SEEDING COMPLETED FOR 40 SHOPS!");
+        log.info("Data seeding completed for 40 shops.");
     }
 }

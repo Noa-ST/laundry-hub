@@ -124,12 +124,18 @@ const ReviewModal = ({ isOpen, onClose, order, onSuccess }) => {
                                 accept="image/*"
                                 multiple
                                 onChange={(e) => {
-                                    if (e.target.files.length > 3) {
+                                    const selectedFiles = Array.from(e.target.files);
+                                    if (selectedFiles.length > 3) {
                                         toast("Chỉ được chọn tối đa 3 ảnh");
                                         e.target.value = '';
                                         return;
                                     }
-                                    setImages(Array.from(e.target.files));
+                                    if (selectedFiles.some(f => f.size > 5 * 1024 * 1024)) {
+                                        toast.error("Mỗi ảnh không được vượt quá 5MB");
+                                        e.target.value = '';
+                                        return;
+                                    }
+                                    setImages(selectedFiles);
                                 }}
                                 className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
                             />

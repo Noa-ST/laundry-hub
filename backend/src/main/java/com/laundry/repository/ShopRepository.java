@@ -11,5 +11,6 @@ import java.util.Optional;
 public interface ShopRepository extends JpaRepository<Shop, Long> {
     List<Shop> findByIsActiveTrue();
     Optional<Shop> findFirstByOwnerId(Long ownerId);
+    Optional<Shop> findByOwnerId(Long ownerId);
     boolean existsByOwnerId(Long ownerId);
 }

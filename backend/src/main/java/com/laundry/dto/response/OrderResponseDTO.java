@@ -25,6 +25,7 @@ public record OrderResponseDTO(
     String receiverName,
     String receiverPhone,
     String deliveryAddress,
+    String pickupAddress,
     
     String note,
     String cancelReason,
@@ -32,5 +33,6 @@ public record OrderResponseDTO(
     java.time.Instant paidAt,
     LocalDateTime createdAt,
     boolean isReviewed,
+    boolean hasDispute,
     List<OrderItemResponseDTO> items
 ) {}

@@ -36,8 +36,9 @@ public class ChatService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Validate sender is either the customer or the shop owner
-        if (!order.getCustomer().getId().equals(senderId) && 
-            !order.getShop().getOwner().getId().equals(senderId)) {
+        boolean isCustomer = order.getCustomer() != null && order.getCustomer().getId().equals(senderId);
+        boolean isShopOwner = order.getShop() != null && order.getShop().getOwner() != null && order.getShop().getOwner().getId().equals(senderId);
+        if (!isCustomer && !isShopOwner) {
             throw new IllegalArgumentException("Không có quyền chat trong đơn hàng này");
         }
 
@@ -64,8 +65,9 @@ public class ChatService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
 
         // Validate user is either the customer or the shop owner
-        if (!order.getCustomer().getId().equals(userId) && 
-            !order.getShop().getOwner().getId().equals(userId)) {
+        boolean isCustomer = order.getCustomer() != null && order.getCustomer().getId().equals(userId);
+        boolean isShopOwner = order.getShop() != null && order.getShop().getOwner() != null && order.getShop().getOwner().getId().equals(userId);
+        if (!isCustomer && !isShopOwner) {
             throw new IllegalArgumentException("Không có quyền xem chat trong đơn hàng này");
         }
 

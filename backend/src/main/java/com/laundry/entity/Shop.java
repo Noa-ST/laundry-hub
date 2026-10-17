@@ -86,6 +86,15 @@ public class Shop {
     @Builder.Default
     private Double maxDeliveryDistance = 10.0;
 
+    @Column(length = 100)
+    private String bankName;
+
+    @Column(length = 50)
+    private String bankAccountNumber;
+
+    @Column(length = 100)
+    private String bankAccountName;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

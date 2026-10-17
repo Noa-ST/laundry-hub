@@ -72,10 +72,9 @@ function LoginPage() {
 
                     <div className="mt-6 pt-6 border-t border-gray-100">
                         <p className="text-xs text-gray-500 mb-3 font-medium uppercase text-center">Tài khoản trải nghiệm</p>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                             <button onClick={() => {setPhone('0862476195'); setPassword('123456');}} type="button" className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-1 rounded font-medium">Khách</button>
                             <button onClick={() => {setPhone('0862476194'); setPassword('123456');}} type="button" className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-1 rounded font-medium">Chủ Tiệm</button>
-                            <button onClick={() => {setPhone('0862476193'); setPassword('123456');}} type="button" className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-1 rounded font-medium">Admin</button>
                         </div>
                     </div>
                 </div>

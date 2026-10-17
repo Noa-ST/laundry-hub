@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import BookingModal from './BookingModal';
 import ShopReviewsModal from './ShopReviewsModal';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +6,24 @@ import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 
 const formatMoney = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+
+// Bộ ảnh tiệm giặt chất lượng cao, đa dạng góc chụp để tránh cảm giác spam dữ liệu ảo
+const SAMPLE_COVERS = [
+    'https://images.unsplash.com/photo-1545173168-9f1947eebb7f?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1517677208171-0bc6725a3e60?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1582735689369-4fe89db7114c?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1604335399105-a0c585fd81a1?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1521656693074-0ef32e80a5d5?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1489274495757-95c7c837b101?auto=format&fit=crop&w=800&q=80',
+];
+
+const getShopCover = (shop) => {
+    if (shop?.coverImage && !shop.coverImage.includes('zeymufohbuqrqtolmkcm')) {
+        return shop.coverImage;
+    }
+    const idx = Math.abs((shop?.id || 1) % SAMPLE_COVERS.length);
+    return SAMPLE_COVERS[idx];
+};
 
 const ShopCard = ({ shop, location }) => {
     const { isAuthenticated } = useAuth();
@@ -15,7 +33,8 @@ const ShopCard = ({ shop, location }) => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
-    const images = shop.coverImage ? [shop.coverImage, ...(shop.galleryImages || [])] : [];
+    const defaultCover = getShopCover(shop);
+    const images = [defaultCover, ...(shop.galleryImages || [])];
 
     const handlePrevImage = (e) => {
         e.stopPropagation();
@@ -106,21 +125,24 @@ const ShopCard = ({ shop, location }) => {
                     )}
                 </div>
                 
-                <div className="p-5 flex-1 flex flex-col">
+                <div className="p-4 sm:p-5 flex-1 flex flex-col">
                     
                     {/* Header: Name & Distance */}
-                    <div className="flex justify-between items-start mb-2 gap-2">
-                        <h3 className="font-bold text-slate-900 text-lg line-clamp-1 group-hover:text-teal-700 transition-colors">
+                    <div className="flex justify-between items-start mb-2 gap-2.5">
+                        <h3 
+                            className="font-bold text-slate-900 text-base sm:text-[17px] leading-snug line-clamp-2 flex-1 group-hover:text-teal-700 transition-colors" 
+                            title={shop.name}
+                        >
                             {shop.name}
                         </h3>
-                        <span className="shrink-0 border border-slate-200 bg-slate-50 text-slate-600 text-[11px] px-2.5 py-0.5 rounded-full font-medium">
+                        <span className="shrink-0 border border-slate-300 bg-slate-100 text-slate-800 text-[11px] px-2.5 py-0.5 rounded-full font-bold mt-0.5">
                             {shop.distanceKm} km
                         </span>
                     </div>
                     
                     {/* Address */}
-                    <div className="flex items-start text-sm text-slate-500 mb-3 line-clamp-1">
-                        <svg className="w-4 h-4 mr-1.5 shrink-0 text-slate-400 stroke-1.5 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="flex items-start text-xs sm:text-[13px] text-slate-700 font-medium mb-3 line-clamp-2 leading-relaxed">
+                        <svg className="w-4 h-4 mr-1.5 shrink-0 text-slate-500 stroke-1.5 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
@@ -128,51 +150,54 @@ const ShopCard = ({ shop, location }) => {
                     </div>
 
                     {/* Status row */}
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xs text-slate-600 mb-4">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xs mb-4">
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                            <span className="font-medium text-emerald-700">Đang mở cửa</span>
+                            <span className="font-semibold text-emerald-800">Đang mở cửa</span>
                         </div>
-                        <div className="w-1 h-1 bg-slate-300 rounded-full shrink-0"></div>
+                        <div className="w-1 h-1 bg-slate-400 rounded-full shrink-0"></div>
                         <button 
                             onClick={() => setIsReviewsOpen(true)}
                             className="flex items-center hover:bg-slate-100 px-1.5 py-0.5 rounded transition-colors whitespace-nowrap"
                         >
-                            <svg className="w-3.5 h-3.5 text-amber-400 mr-1 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <svg className="w-3.5 h-3.5 text-amber-500 mr-1 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
                             </svg>
-                            <span className="font-medium text-slate-700">{shop.rating > 0 ? shop.rating : 'Mới'}</span>
-                            <span className="text-slate-400 ml-1">({shop.reviewCount || 0})</span>
+                            <span className="font-bold text-slate-800">{shop.rating > 0 ? shop.rating : 'Mới'}</span>
+                            <span className="text-slate-600 ml-1 font-semibold">({shop.reviewCount || 0})</span>
                         </button>
-                        <div className="w-1 h-1 bg-slate-300 rounded-full shrink-0"></div>
-                        <span className="whitespace-nowrap">{shop.operatingHours || '07:00 - 21:00'}</span>
-                        <div className="w-1 h-1 bg-slate-300 rounded-full shrink-0"></div>
-                        <span className="font-medium whitespace-nowrap">{shop.totalWashers || 0} máy</span>
+                        <div className="w-1 h-1 bg-slate-400 rounded-full shrink-0"></div>
+                        <span className="whitespace-nowrap font-semibold text-slate-800">{shop.operatingHours || '07:00 - 21:00'}</span>
+                        <div className="w-1 h-1 bg-slate-400 rounded-full shrink-0"></div>
+                        <span className="font-bold text-slate-900 whitespace-nowrap">
+                            {shop.totalWashers || 0} máy giặt
+                        </span>
                     </div>
 
                     {/* Bottom Content Wrapper (Prices & Vouchers) */}
                     <div className="mt-auto flex flex-col gap-3">
                         {/* Price Preview */}
-                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1.5">
+                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/80 space-y-1.5">
                             {shop.services && shop.services.length > 0 ? (
                                 <>
                                     {shop.services.slice(0, 2).map(service => (
                                         <div key={service.id} className="flex justify-between items-center text-[13px]">
-                                            <span className="text-slate-600 truncate pr-2">{service.name}</span>
-                                            <span className="font-semibold text-slate-900 shrink-0">
+                                            <span className="text-slate-800 font-medium truncate pr-2">{service.name}</span>
+                                            <span className="font-bold text-slate-900 shrink-0">
                                                 {service.price > 0 ? formatMoney(service.price) : 'Liên hệ'}
-                                                <span className="text-slate-400 font-normal">/{service.unit}</span>
+                                                <span className="text-slate-600 font-medium ml-0.5">/{service.unit}</span>
                                             </span>
                                         </div>
                                     ))}
                                     {minPrice > 0 && (
-                                        <p className="text-[11px] text-slate-500 font-medium pt-1 mt-1 border-t border-slate-200/50">
-                                            Giá chỉ từ <span className="text-slate-700 font-bold">{formatMoney(minPrice)}</span>
+                                        <p className="text-[11px] text-slate-700 font-semibold pt-1 mt-1 border-t border-slate-200 flex justify-between items-center">
+                                            <span>Giá chỉ từ</span>
+                                            <span className="text-teal-800 font-black">{formatMoney(minPrice)}</span>
                                         </p>
                                     )}
                                 </>
                             ) : (
-                                <p className="text-[13px] text-slate-400 italic text-center py-2">Đang cập nhật bảng giá</p>
+                                <p className="text-[13px] text-slate-600 italic text-center py-2 font-medium">Đang cập nhật bảng giá</p>
                             )}
                         </div>
 
@@ -180,7 +205,7 @@ const ShopCard = ({ shop, location }) => {
                         <div className="min-h-[52px] flex flex-col justify-end">
                             {activeVouchers.length > 0 && (
                                 <div>
-                                    <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Ưu đãi của Tiệm</h4>
+                                    <h4 className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider mb-2">Ưu đãi của Tiệm</h4>
                                     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                                         {activeVouchers.map(v => (
                                             <div key={v.id} className="flex-shrink-0 bg-red-50 border border-red-100 rounded-lg px-2 py-1 flex items-center gap-1.5" title={v.discountType === 'PERCENTAGE' ? `Giảm ${v.discountValue}%` : `Giảm ${formatMoney(v.discountValue)}`}>

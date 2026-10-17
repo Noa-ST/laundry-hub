@@ -8,6 +8,7 @@ import com.laundry.dto.request.UpdateAvatarRequestDTO;
 import com.laundry.auth.service.AuthService;
 import com.laundry.dto.response.ApiResponse;
 import com.laundry.security.SecurityUtils;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,13 +21,13 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<AuthResponseDTO>> register(@RequestBody RegisterRequestDTO request) {
+    public ResponseEntity<ApiResponse<AuthResponseDTO>> register(@Valid @RequestBody RegisterRequestDTO request) {
         AuthResponseDTO response = authService.register(request);
         return ResponseEntity.ok(ApiResponse.success("Đăng ký thành công", response));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<AuthResponseDTO>> login(@RequestBody LoginRequestDTO request) {
+    public ResponseEntity<ApiResponse<AuthResponseDTO>> login(@Valid @RequestBody LoginRequestDTO request) {
         AuthResponseDTO response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", response));
     }
@@ -39,20 +40,20 @@ public class AuthController {
     }
     
     @PutMapping("/me/avatar")
-    public ResponseEntity<ApiResponse<AuthResponseDTO>> updateAvatar(@RequestBody UpdateAvatarRequestDTO request) {
+    public ResponseEntity<ApiResponse<AuthResponseDTO>> updateAvatar(@Valid @RequestBody UpdateAvatarRequestDTO request) {
         Long currentUserId = SecurityUtils.getCurrentUserId();
         AuthResponseDTO response = authService.updateAvatar(currentUserId, request.getAvatarUrl());
         return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh đại diện thành công", response));
     }
     
     @PostMapping("/refresh-token")
-    public ResponseEntity<ApiResponse<AuthResponseDTO>> refreshToken(@RequestBody RefreshTokenRequestDTO request) {
+    public ResponseEntity<ApiResponse<AuthResponseDTO>> refreshToken(@Valid @RequestBody RefreshTokenRequestDTO request) {
         AuthResponseDTO response = authService.refreshToken(request.getRefreshToken());
         return ResponseEntity.ok(ApiResponse.success("Refresh token thành công", response));
     }
     
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(@RequestBody RefreshTokenRequestDTO request) {
+    public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody RefreshTokenRequestDTO request) {
         authService.logout(request.getRefreshToken());
         return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công", null));
     }

@@ -1,5 +1,6 @@
 package com.laundry.mockuser.service;
 
+import com.laundry.entity.Role;
 import com.laundry.mockuser.dto.MockUserResponseDTO;
 import com.laundry.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ public class MockUserServiceImpl implements MockUserService {
     @Override
     public List<MockUserResponseDTO> getAllMockUsers() {
         return userRepository.findAll().stream()
+                .filter(user -> user.getRole() != Role.ADMIN)
                 .map(user -> new MockUserResponseDTO(
                         user.getId(),
                         user.getFullName(),

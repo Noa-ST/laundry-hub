@@ -10,6 +10,8 @@ import CancelOrderModal from '../components/CancelOrderModal';
 import ChatModal from '../components/ChatModal';
 import StatisticsTab from '../components/StatisticsTab';
 import VoucherTab from '../components/VoucherTab';
+import OwnerDisputeTab from '../components/OwnerDisputeTab';
+import OwnerPayoutTab from '../components/OwnerPayoutTab';
 import LocationPickerMap from '../components/LocationPickerMap';
 import { useWebSocket } from '../context/WebSocketContext';
 import toast from 'react-hot-toast';
@@ -33,6 +35,7 @@ const OwnerDashboardPage = () => {
     const [inspectOrder, setInspectOrder] = useState(null);
     const [cancelOrderId, setCancelOrderId] = useState(null);
     const [chatOrder, setChatOrder] = useState(null);
+    const [targetDisputeOrderId, setTargetDisputeOrderId] = useState(null);
     
     // Settings Form State
     const [isSavingShop, setIsSavingShop] = useState(false);
@@ -158,6 +161,12 @@ const OwnerDashboardPage = () => {
         fetchDashboardData();
     };
 
+    const handleViewDispute = (order) => {
+        setSelectedOrder(null);
+        setTargetDisputeOrderId(order.id);
+        setMainTab('disputes');
+    };
+
     const handleSaveShop = async (e) => {
         e.preventDefault();
         try {
@@ -216,6 +225,11 @@ const OwnerDashboardPage = () => {
             return;
         }
 
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Kích thước ảnh đại diện không được vượt quá 5MB.');
+            return;
+        }
+
         try {
             setUploadingImage(true);
             const formData = new FormData();
@@ -271,6 +285,10 @@ const OwnerDashboardPage = () => {
             const uploadedUrls = [];
             for (const file of files) {
                 if (!file.type.startsWith('image/')) continue;
+                if (file.size > 5 * 1024 * 1024) {
+                    toast.error(`Ảnh "${file.name}" vượt quá 5MB và đã bị bỏ qua.`);
+                    continue;
+                }
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('upload_preset', uploadPreset); 
@@ -336,40 +354,47 @@ const OwnerDashboardPage = () => {
     const renderActionButtons = (order, isTableMode = false, isModalMode = false) => {
         const { id, status, inboundType, outboundType } = order;
         
-        let btnBaseClass = "font-semibold transition-all flex items-center justify-center";
+        let btnBaseClass = "font-bold transition-all flex items-center justify-center whitespace-nowrap";
         
         if (isTableMode) {
-            btnBaseClass += " whitespace-nowrap text-[11px] py-1.5 px-3 rounded-md shadow-sm";
-        } else if (isModalMode) {
-            btnBaseClass += " w-full text-xs py-2.5 px-6 rounded-xl shadow-sm";
+            btnBaseClass += " text-[11px] py-1.5 px-3 rounded-md shadow-sm";
         } else {
-            btnBaseClass += " w-full mt-4 text-xs py-2.5 px-3 rounded-xl shadow-sm";
+            btnBaseClass += " h-10 px-5 text-xs rounded-xl shadow-sm";
         }
         
         let actions = null;
 
         if (status === 'PENDING') {
             actions = (
-                <div className={`flex items-center ${isTableMode ? 'gap-2' : 'gap-3 w-full'}`}>
+                <div className={`flex items-center ${isTableMode ? 'gap-2' : 'gap-2.5'}`}>
                     <button onClick={() => updateStatus(id, 'CONFIRMED')} className={`${btnBaseClass} bg-slate-900 text-white hover:bg-slate-800`}>Nhận đơn</button>
-                    <button onClick={() => setCancelOrderId(id)} className={`${isTableMode ? 'text-rose-600 text-xs hover:underline' : btnBaseClass + ' bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>Từ chối</button>
+                    <button onClick={() => setCancelOrderId(id)} className={`${isTableMode ? 'text-rose-600 text-xs hover:underline' : btnBaseClass + ' bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'}`}>Từ chối</button>
                 </div>
             );
         } else if (status === 'CONFIRMED') {
-            if (inboundType === 'SHOP_PICK_UP') {
-                actions = <button onClick={() => updateStatus(id, 'PICKING_UP')} className={`${btnBaseClass} bg-slate-800 text-white hover:bg-slate-900`}>Đi lấy đồ</button>;
-            } else if (inboundType === 'CUSTOMER_DROP_OFF') {
-                actions = <button onClick={() => updateStatus(id, 'RECEIVED')} className={`${btnBaseClass} bg-slate-800 text-white hover:bg-slate-900`}>Đã nhận đồ</button>;
-            }
+            const nextBtn = inboundType === 'SHOP_PICK_UP'
+                ? <button onClick={() => updateStatus(id, 'PICKING_UP')} className={`${btnBaseClass} bg-slate-800 text-white hover:bg-slate-900`}>Đi lấy đồ</button>
+                : <button onClick={() => updateStatus(id, 'RECEIVED')} className={`${btnBaseClass} bg-slate-800 text-white hover:bg-slate-900`}>Đã nhận đồ</button>;
+            actions = (
+                <div className={`flex items-center ${isTableMode ? 'gap-2' : 'gap-2.5'}`}>
+                    {nextBtn}
+                    <button onClick={() => setCancelOrderId(id)} className={`${isTableMode ? 'text-rose-600 text-xs hover:underline' : btnBaseClass + ' bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'}`}>Hủy đơn</button>
+                </div>
+            );
         } else if (status === 'PICKING_UP') {
-            actions = <button onClick={() => updateStatus(id, 'RECEIVED')} className={`${btnBaseClass} bg-slate-800 text-white hover:bg-slate-900`}>Đã mang về tiệm</button>;
+            actions = (
+                <div className={`flex items-center ${isTableMode ? 'gap-2' : 'gap-2.5'}`}>
+                    <button onClick={() => updateStatus(id, 'RECEIVED')} className={`${btnBaseClass} bg-slate-800 text-white hover:bg-slate-900`}>Đã mang về tiệm</button>
+                    <button onClick={() => setCancelOrderId(id)} className={`${isTableMode ? 'text-rose-600 text-xs hover:underline' : btnBaseClass + ' bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'}`}>Hủy đơn</button>
+                </div>
+            );
         } else if (status === 'RECEIVED') {
             if (isTableMode) {
                 // In table mode, maybe just a direct button to open modal or process
-                actions = <button onClick={() => setSelectedOrder(order)} className={`${btnBaseClass} bg-indigo-600 text-white hover:bg-indigo-700`}>Kiểm tra & Giặt</button>;
+                actions = <button onClick={() => setSelectedOrder(order)} className={`${btnBaseClass} bg-slate-900 text-white hover:bg-slate-800`}>Kiểm tra & Giặt</button>;
             } else {
                 // In modal mode, it acts as the primary "Tiến hành giặt"
-                actions = <button onClick={() => updateStatus(id, 'PROCESSING')} className={`${btnBaseClass} bg-indigo-600 text-white hover:bg-indigo-700`}>Bắt đầu giặt</button>;
+                actions = <button onClick={() => updateStatus(id, 'PROCESSING')} className={`${btnBaseClass} bg-slate-900 text-white hover:bg-slate-800`}>Bắt đầu giặt</button>;
             }
         } else if (status === 'PROCESSING') {
             actions = <button onClick={() => updateStatus(id, 'READY')} className={`${btnBaseClass} bg-sky-600 text-white hover:bg-sky-700`}>Đã giặt xong</button>;
@@ -473,8 +498,8 @@ const OwnerDashboardPage = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                             </svg>
                         </div>
-                        <h1 className="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700 truncate" title={hasShop ? shopData.name : 'Khởi tạo Tiệm Giặt'}>
-                            {hasShop ? shopData.name : 'Khởi tạo Tiệm Giặt'}
+                        <h1 className="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700 truncate" title={hasShop && shopData?.name ? shopData.name : 'Khởi tạo Tiệm Giặt'}>
+                            {hasShop && shopData?.name ? shopData.name : 'Khởi tạo Tiệm Giặt'}
                         </h1>
                         {hasShop && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 uppercase tracking-wide shrink-0 hidden sm:inline-block">
@@ -503,6 +528,8 @@ const OwnerDashboardPage = () => {
                     {[
                         { id: 'statistics', label: 'Thống kê' },
                         { id: 'orders', label: 'Đơn hàng' },
+                        { id: 'payouts', label: 'Ví & Giải ngân' },
+                        { id: 'disputes', label: 'Khiếu nại & Bồi thường' },
                         { id: 'vouchers', label: 'Mã Giảm Giá' },
                         { id: 'services', label: 'Dịch vụ & Bảng giá' },
                         { id: 'machines', label: 'Máy giặt & Sấy' },
@@ -513,13 +540,13 @@ const OwnerDashboardPage = () => {
                             onClick={() => handleTabClick(t.id)}
                             className={`pb-3 px-3 text-sm whitespace-nowrap transition-all duration-300 relative ${
                                 mainTab === t.id 
-                                ? 'text-indigo-700 font-bold' 
+                                ? 'text-slate-900 font-bold' 
                                 : 'text-slate-500 hover:text-slate-900 font-medium'
                             } ${!hasShop && t.id !== 'settings' ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             {t.label}
                             {mainTab === t.id && (
-                                <div className="absolute bottom-0 left-0 w-full h-[3px] bg-indigo-600 rounded-t-full"></div>
+                                <div className="absolute bottom-0 left-0 w-full h-[3px] bg-slate-900 rounded-t-full"></div>
                             )}
                         </button>
                     ))}
@@ -536,10 +563,28 @@ const OwnerDashboardPage = () => {
                     </div>
                 )}
 
+                {/* -------------------- TAB: PAYOUTS -------------------- */}
+                {mainTab === 'payouts' && hasShop && (
+                    <div className="animate-fade-in">
+                        <OwnerPayoutTab />
+                    </div>
+                )}
+
                 {/* -------------------- TAB: VOUCHERS -------------------- */}
                 {mainTab === 'vouchers' && hasShop && (
                     <div className="animate-fade-in">
                         <VoucherTab />
+                    </div>
+                )}
+
+                {/* -------------------- TAB: DISPUTES -------------------- */}
+                {mainTab === 'disputes' && hasShop && (
+                    <div className="animate-fade-in">
+                        <OwnerDisputeTab 
+                            shopId={shopData?.id} 
+                            targetOrderId={targetDisputeOrderId}
+                            onClearTargetOrder={() => setTargetDisputeOrderId(null)}
+                        />
                     </div>
                 )}
 
@@ -585,61 +630,86 @@ const OwnerDashboardPage = () => {
                                 <p className="text-slate-500 text-sm">Hiện không có đơn hàng nào khớp với trạng thái lọc này.</p>
                             </div>
                         ) : (
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-                                <table className="w-full text-left border-collapse min-w-[800px]">
-                                    <thead>
-                                        <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                            <th className="p-4 whitespace-nowrap">Đơn Hàng</th>
-                                            <th className="p-4">Khách Hàng</th>
-                                            <th className="p-4 text-right">Tổng Tiền</th>
-                                            <th className="p-4 text-center">Trạng Thái</th>
-                                            <th className="p-4 text-center">Hành Động</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 text-sm">
-                                        {filteredOrders.map(order => (
-                                            <tr key={order.id} className="hover:bg-slate-50/80 transition-colors border-b border-slate-100 last:border-0">
-                                                <td className="p-4 align-middle whitespace-nowrap">
-                                                    <span className="font-bold text-slate-900 bg-slate-100 inline-block px-2 py-0.5 rounded text-xs mr-2">#{order.id}</span>
-                                                    <span className="text-[11px] font-medium text-slate-500">{new Date(order.bookingTime).toLocaleString('vi-VN')}</span>
-                                                </td>
-                                                <td className="p-4 align-middle whitespace-nowrap">
-                                                    <div className="flex flex-col">
-                                                        <span className="font-bold text-slate-900">{order.receiverName || 'Khách vãng lai'}</span>
-                                                        <span className="text-xs text-slate-500">({order.receiverPhone || '--'})</span>
-                                                        <div className="flex items-center gap-1.5 mt-2">
-                                                            <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                                                                {order.inboundType === 'CUSTOMER_DROP_OFF' ? 'Nhận: Khách mang tới' : 'Nhận: Tiệm đi lấy'}
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse min-w-[850px]">
+                                        <thead>
+                                            <tr className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                                <th className="py-3.5 px-4 pl-6 w-[20%] whitespace-nowrap">Đơn Hàng</th>
+                                                <th className="py-3.5 px-4 w-[28%]">Khách Hàng</th>
+                                                <th className="py-3.5 px-4 w-[18%] text-left">Tổng Tiền</th>
+                                                <th className="py-3.5 px-4 w-[16%] text-center">Trạng Thái</th>
+                                                <th className="py-3.5 px-4 pr-6 w-[18%] text-right">Hành Động</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 text-sm">
+                                            {filteredOrders.map((order, idx) => (
+                                                <tr 
+                                                    key={order.id} 
+                                                    className={`transition-colors border-b border-slate-100 last:border-0 ${
+                                                        idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
+                                                    } hover:bg-teal-50/30`}
+                                                >
+                                                    <td className="py-3.5 px-4 pl-6 align-middle whitespace-nowrap">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-mono font-bold text-slate-900 bg-slate-100 border border-slate-200/80 inline-block px-2 py-0.5 rounded text-xs shrink-0">
+                                                                #{order.id}
                                                             </span>
-                                                            <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                                                                {order.outboundType === 'CUSTOMER_PICK_UP' ? 'Trả: Khách tự lấy' : 'Trả: Tiệm đi giao'}
+                                                            <span className="text-[11px] font-medium text-slate-500 whitespace-nowrap">
+                                                                {new Date(order.bookingTime).toLocaleString('vi-VN')}
                                                             </span>
                                                         </div>
-                                                    </div>
-                                                </td>
-                                                <td className="p-4 align-middle text-right whitespace-nowrap">
-                                                    <span className="font-bold text-slate-900 text-[14px]">{formatMoney(order.finalTotalPrice)}</span>
-                                                    {order.paymentStatus === 'PAID' && (
-                                                        <span className="ml-2 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md inline-block border bg-emerald-50 border-emerald-200 text-emerald-700">
-                                                            Đã Thanh Toán
+                                                    </td>
+                                                    <td className="py-3.5 px-4 align-middle">
+                                                        <div className="flex flex-col">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="font-bold text-slate-900">{order.receiverName || 'Khách vãng lai'}</span>
+                                                                <span className="text-xs text-slate-500">({order.receiverPhone || '--'})</span>
+                                                            </div>
+                                                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                                                <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 whitespace-nowrap">
+                                                                    {order.inboundType === 'CUSTOMER_DROP_OFF' ? 'Nhận: Khách mang tới' : 'Nhận: Tiệm đi lấy'}
+                                                                </span>
+                                                                <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 whitespace-nowrap">
+                                                                    {order.outboundType === 'CUSTOMER_PICK_UP' ? 'Trả: Khách tự lấy' : 'Trả: Tiệm đi giao'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3.5 px-4 align-middle whitespace-nowrap text-left">
+                                                        <div className="flex flex-col gap-1 items-start">
+                                                            <span className="font-bold text-slate-900 text-[14px] tracking-tight">
+                                                                {formatMoney(order.finalTotalPrice)}
+                                                            </span>
+                                                            {order.paymentStatus === 'PAID' ? (
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md inline-flex items-center gap-1 border bg-emerald-50 border-emerald-200 text-emerald-700">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                                                    Đã Thanh Toán
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md inline-flex items-center gap-1 border bg-amber-50 border-amber-200 text-amber-700">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
+                                                                    Chưa Thanh Toán
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
+                                                        <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded border ${getStatusStyle(order.status)}`}>
+                                                            {getStatusText(order.status)}
                                                         </span>
-                                                    )}
-                                                </td>
-                                                <td className="p-4 align-middle text-center whitespace-nowrap">
-                                                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded border ${getStatusStyle(order.status)}`}>
-                                                        {getStatusText(order.status)}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4 align-middle whitespace-nowrap">
-                                                    {renderActionButtons(order, true)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                                    </td>
+                                                    <td className="py-3.5 px-4 pr-6 align-middle whitespace-nowrap">
+                                                        {renderActionButtons(order, true)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                                 
                                 {page < totalPages - 1 && (
-                                    <div className="flex justify-center p-4 border-t border-slate-100">
+                                    <div className="flex justify-center p-4 border-t border-slate-100 bg-white">
                                         <button
                                             onClick={() => fetchOrders(page + 1, true, activeTab)}
                                             disabled={loadingMore}
@@ -900,10 +970,11 @@ const OwnerDashboardPage = () => {
                 onClose={() => setSelectedOrder(null)}
                 order={selectedOrder}
                 formatMoney={formatMoney}
-                renderActions={(order) => renderActionButtons(order, false)}
+                renderActions={(order, isTableMode = false, isModalMode = true) => renderActionButtons(order, isTableMode, isModalMode)}
                 onUpdateSuccess={() => {
                     fetchDashboardData();
                 }}
+                onViewDispute={handleViewDispute}
             />
             {/* Chat Modal */}
             {chatOrder && (

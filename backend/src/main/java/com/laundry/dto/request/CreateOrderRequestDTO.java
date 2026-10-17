@@ -14,6 +14,7 @@ public record CreateOrderRequestDTO(
     
     @NotNull InboundType inboundType,
     @NotNull OutboundType outboundType,
+    PaymentMethod paymentMethod,
     
     String receiverName,
     String receiverPhone,
@@ -21,5 +22,10 @@ public record CreateOrderRequestDTO(
     
     Double userLat,
     Double userLng,
-    String voucherCode
+    String voucherCode,
+
+    // Địa chỉ nhận đồ (Shop đến lấy tận nơi) - tách riêng với địa chỉ trả đồ
+    String pickupAddress,
+    Double pickupLat,
+    Double pickupLng
 ) {}

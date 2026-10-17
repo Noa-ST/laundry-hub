@@ -55,11 +55,22 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }) => {
     const handleSaveAddress = async (e) => {
         e.preventDefault();
         try {
+            if (!addressText || !addressText.trim()) {
+                toast.error("Vui lòng nhập địa chỉ cụ thể");
+                return;
+            }
+            const latitude = parseFloat(lat);
+            const longitude = parseFloat(lng);
+            if (isNaN(latitude) || isNaN(longitude) || (latitude === 0 && longitude === 0)) {
+                toast.error("Vui lòng chọn vị trí trên bản đồ để xác định tọa độ GPS");
+                return;
+            }
+
             const payload = {
                 label,
-                address: addressText,
-                latitude: parseFloat(lat),
-                longitude: parseFloat(lng)
+                address: addressText.trim(),
+                latitude,
+                longitude
             };
             
             let res;
@@ -70,6 +81,7 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }) => {
             }
             
             if (res.success) {
+                toast.success(editId ? "Cập nhật địa chỉ thành công!" : "Đã thêm địa chỉ mới!");
                 setIsAdding(false);
                 setEditId(null);
                 setLabel('Nhà riêng');
@@ -114,7 +126,7 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }) => {
     if (!isOpen) return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
             <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] overflow-hidden animate-slide-up">
                 
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white z-20 shrink-0">

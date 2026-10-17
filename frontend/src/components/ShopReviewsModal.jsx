@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import axiosClient from '../api/axiosClient';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -42,9 +43,9 @@ const ShopReviewsModal = ({ shop, isOpen, onClose }) => {
 
     if (!isOpen || !shop) return null;
 
-    return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] animate-slide-up">
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] animate-slide-up" onClick={e => e.stopPropagation()}>
                 
                 <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-3xl shrink-0">
                     <div>
@@ -133,14 +134,15 @@ const ShopReviewsModal = ({ shop, isOpen, onClose }) => {
             
             {/* Image Viewer */}
             {selectedImage && (
-                <div className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setSelectedImage(null)}>
+                <div className="fixed inset-0 z-[10000] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setSelectedImage(null)}>
                     <button className="absolute top-4 right-4 text-white/70 hover:text-white p-2" onClick={() => setSelectedImage(null)}>
                         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                     <img src={selectedImage} alt="Full screen" className="max-w-full max-h-[90vh] object-contain rounded-xl" onClick={e => e.stopPropagation()} />
                 </div>
             )}
-        </div>
+        </div>,
+        document.body
     );
 };
 

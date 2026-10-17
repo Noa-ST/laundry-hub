@@ -3,6 +3,8 @@ import axiosClient from '../api/axiosClient';
 import { useWebSocket } from '../context/WebSocketContext';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { describeNotification } from '../utils/orderStatus';
+import NotificationIcon from './NotificationIcon';
 
 const NotificationBell = () => {
     const [notifications, setNotifications] = useState([]);
@@ -127,31 +129,35 @@ const NotificationBell = () => {
                             </div>
                         ) : (
                             <div className="divide-y divide-gray-100">
-                                {notifications.map(notif => (
-                                    <div 
-                                        key={notif.id || Math.random()} 
-                                        className={`p-3 hover:bg-gray-50 transition-colors cursor-pointer ${!notif.read ? 'bg-indigo-50/30' : ''}`}
-                                    >
-                                        <div className="flex justify-between items-start">
-                                            <div className="flex-1">
-                                                <h4 className={`text-sm font-medium ${!notif.read ? 'text-indigo-900' : 'text-gray-800'}`}>
-                                                    {notif.title}
-                                                </h4>
-                                                <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
-                                                <span className="text-[10px] text-gray-400 mt-1 block">
+                                {notifications.map(notif => {
+                                    const meta = describeNotification(notif);
+                                    return (
+                                        <div 
+                                            key={notif.id || Math.random()} 
+                                            className={`p-3.5 hover:bg-slate-50 transition-colors cursor-pointer flex items-start gap-3 ${!notif.read ? 'bg-indigo-50/30' : ''}`}
+                                        >
+                                            <NotificationIcon icon={meta.icon} tone={meta.tone} size="md" />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start gap-1">
+                                                    <h4 className={`text-xs font-bold leading-snug ${!notif.read ? 'text-indigo-950 font-bold' : 'text-slate-800'}`}>
+                                                        {meta.title}
+                                                    </h4>
+                                                    {!notif.read && notif.id && (
+                                                        <button 
+                                                            onClick={(e) => handleMarkAsRead(notif.id, e)}
+                                                            className="w-2 h-2 bg-indigo-600 rounded-full shrink-0 ml-1 mt-1 shadow-sm hover:scale-125 transition-transform"
+                                                            title="Đánh dấu đã đọc"
+                                                        ></button>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-slate-600 mt-0.5 leading-relaxed break-words">{meta.message}</p>
+                                                <span className="text-[10px] text-slate-400 mt-1.5 block">
                                                     {notif.createdAt ? formatTime(notif.createdAt) : 'Vừa xong'}
                                                 </span>
                                             </div>
-                                            {!notif.read && notif.id && (
-                                                <button 
-                                                    onClick={(e) => handleMarkAsRead(notif.id, e)}
-                                                    className="w-2.5 h-2.5 bg-indigo-600 rounded-full shrink-0 ml-2 shadow-sm"
-                                                    title="Đánh dấu đã đọc"
-                                                ></button>
-                                            )}
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                         {page < totalPages - 1 && (

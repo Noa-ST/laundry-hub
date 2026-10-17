@@ -20,6 +20,13 @@ const ShopDiscoveryPage = () => {
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
     const [tempLat, setTempLat] = useState(null);
     const [tempLng, setTempLng] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 8;
+
+    // Reset về trang 1 khi người dùng đổi bộ lọc tìm kiếm
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, selectedCategory, sortBy, minRating, radius, location]);
 
     useEffect(() => {
         if (!location) return;
@@ -86,6 +93,34 @@ const ShopDiscoveryPage = () => {
             return (a.distanceKm || 0) - (b.distanceKm || 0);
         }
     });
+
+    // Pagination calculations
+    const totalShops = filteredShops.length;
+    const totalPages = Math.ceil(totalShops / itemsPerPage) || 1;
+    const paginatedShops = filteredShops.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= totalPages) {
+            setCurrentPage(newPage);
+            const el = document.getElementById('shops-grid-section');
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    };
+
+    const getPageNumbers = () => {
+        if (totalPages <= 7) {
+            return Array.from({ length: totalPages }, (_, i) => i + 1);
+        }
+        if (currentPage <= 4) {
+            return [1, 2, 3, 4, 5, '...', totalPages];
+        }
+        if (currentPage >= totalPages - 3) {
+            return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+        }
+        return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+    };
 
     return (
         <div className="bg-slate-50/60 font-sans pb-12">
@@ -221,7 +256,7 @@ const ShopDiscoveryPage = () => {
                                     className={`whitespace-nowrap px-4 py-2 rounded-full text-[13px] font-semibold transition-all border shrink-0 ${
                                         selectedCategory === cat.id 
                                         ? 'bg-teal-600 text-white border-teal-600 shadow-sm' 
-                                        : 'bg-white text-slate-600 border-slate-200 hover:border-teal-500/30 hover:bg-teal-50'
+                                        : 'bg-white text-slate-700 border-slate-300 hover:border-teal-500 hover:bg-teal-50/50'
                                     }`}
                                 >
                                     {cat.label}
@@ -233,19 +268,38 @@ const ShopDiscoveryPage = () => {
                         <button 
                             onClick={() => setMinRating(minRating === 4 ? 0 : 4)}
                             className={`shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-semibold transition-all border ${
-                                minRating === 4 ? 'bg-amber-50 text-amber-700 border-amber-300 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-amber-50/50 hover:border-amber-200'
+                                minRating === 4 ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-sm' : 'bg-white text-slate-700 border-slate-300 hover:bg-amber-50/50 hover:border-amber-300'
                             }`}
                         >
-                            <svg className={`w-4 h-4 ${minRating === 4 ? 'text-amber-500' : 'text-slate-400'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                            <svg className={`w-4 h-4 ${minRating === 4 ? 'text-amber-500' : 'text-slate-500'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                             Chỉ tiệm uy tín (≥ 4 Sao)
                         </button>
                     </div>
                 </div>
 
+                {/* Results Header Info */}
+                <div id="shops-grid-section" className="flex items-center justify-between mb-5 pt-3 scroll-mt-24">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-slate-800">
+                            Tìm thấy <span className="text-teal-700 font-extrabold">{totalShops}</span> tiệm giặt
+                        </span>
+                        {radius && (
+                            <span className="text-[11px] bg-slate-100 text-slate-700 font-bold px-2.5 py-0.5 rounded-full border border-slate-300">
+                                trong bán kính {radius >= 1000 ? 'Toàn quốc' : `${radius} km`}
+                            </span>
+                        )}
+                    </div>
+                    {viewMode === 'grid' && totalPages > 1 && (
+                        <span className="text-xs text-slate-700 font-semibold hidden sm:inline-block">
+                            Trang <strong className="text-slate-900">{currentPage}</strong> / {totalPages} (8 tiệm / trang)
+                        </span>
+                    )}
+                </div>
+
                 {/* Grid */}
                 {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[1, 2, 3].map(i => (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                             <div key={i} className="bg-white rounded-2xl p-5 border border-slate-200/80 h-72 animate-pulse flex flex-col shadow-sm">
                                 <div className="h-6 bg-slate-200 rounded-md w-2/3 mb-4"></div>
                                 <div className="h-4 bg-slate-100 rounded-md w-full mb-2"></div>
@@ -268,7 +322,7 @@ const ShopDiscoveryPage = () => {
                         <p className="mt-1 text-sm text-slate-500">Thử thay đổi bộ lọc hoặc mở rộng bán kính tìm kiếm của bạn.</p>
                         {radius < 5000 && (
                             <button 
-                                onClick={() => { setRadius(5000); setSearchQuery(''); setActiveFilter('ALL'); }}
+                                onClick={() => { setRadius(5000); setSearchQuery(''); setSelectedCategory('ALL'); }}
                                 className="mt-4 px-5 py-2.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-xl text-sm font-semibold transition-colors"
                             >
                                 Xóa bộ lọc & Tìm toàn quốc
@@ -276,13 +330,78 @@ const ShopDiscoveryPage = () => {
                         )}
                     </div>
                 ) : viewMode === 'map' ? (
-                    <ShopMapView shops={filteredShops} userLocation={location} />
+                    <ShopMapView shops={filteredShops} userLocation={location} location={location} />
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {filteredShops.map(shop => (
-                            <ShopCard key={shop.id} shop={shop} location={location} />
-                        ))}
-                    </div>
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {paginatedShops.map(shop => (
+                                <ShopCard key={shop.id} shop={shop} location={location} />
+                            ))}
+                        </div>
+
+                        {/* Pagination Navigation */}
+                        {totalPages > 1 && (
+                            <div className="mt-10 pt-6 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="text-xs text-slate-500 font-medium text-center sm:text-left">
+                                    Hiển thị <span className="font-bold text-slate-800">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="font-bold text-slate-800">{Math.min(currentPage * itemsPerPage, totalShops)}</span> trong số <span className="font-bold text-slate-800">{totalShops}</span> tiệm giặt
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    {/* Prev Button */}
+                                    <button
+                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="h-9 px-3 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                                        title="Trang trước"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                                        </svg>
+                                        <span className="hidden sm:inline">Trước</span>
+                                    </button>
+
+                                    {/* Page Number Buttons */}
+                                    <div className="flex items-center gap-1">
+                                        {getPageNumbers().map((pageItem, idx) => {
+                                            if (pageItem === '...') {
+                                                return (
+                                                    <span key={`ellipsis-${idx}`} className="w-8 text-center text-slate-400 font-bold text-xs select-none">
+                                                        ...
+                                                    </span>
+                                                );
+                                            }
+                                            const isActive = pageItem === currentPage;
+                                            return (
+                                                <button
+                                                    key={pageItem}
+                                                    onClick={() => handlePageChange(pageItem)}
+                                                    className={`w-9 h-9 rounded-xl text-xs font-bold transition-all flex items-center justify-center ${
+                                                        isActive
+                                                            ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30 ring-2 ring-teal-600/20'
+                                                            : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    {pageItem}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Next Button */}
+                                    <button
+                                        onClick={() => handlePageChange(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                        className="h-9 px-3 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                                        title="Trang sau"
+                                    >
+                                        <span className="hidden sm:inline">Sau</span>
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 

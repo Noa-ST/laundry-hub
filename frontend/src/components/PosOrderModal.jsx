@@ -10,6 +10,8 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
     const [items, setItems] = useState([]);
     const [notes, setNotes] = useState('');
     const [voucherCode, setVoucherCode] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('COD');
+    const [isPaid, setIsPaid] = useState(true);
     
     const [services, setServices] = useState([]);
     const [activeVouchers, setActiveVouchers] = useState([]);
@@ -29,6 +31,8 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
             setItems([]);
             setNotes('');
             setVoucherCode('');
+            setPaymentMethod('COD');
+            setIsPaid(true);
             setShowServiceList(false);
             setIsCustomerFound(false);
         }
@@ -187,7 +191,9 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                     quantity: parseFloat(i.quantity),
                     unitPrice: parseFloat(i.unitPrice)
                 })),
-                voucherCode: voucherCode || null
+                voucherCode: voucherCode || null,
+                paymentMethod,
+                isPaid
             };
 
             const res = await axiosClient.post('/owner/orders/pos', payload);
@@ -219,7 +225,7 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                     <div>
                         <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                             Tạo đơn tại quầy (POS)
-                            <span className="bg-indigo-100 text-indigo-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">Trực tiếp</span>
+                            <span className="bg-slate-100 text-slate-800 border border-slate-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">Tại quầy</span>
                         </h2>
                         <p className="text-xs text-slate-500 mt-0.5">{new Date().toLocaleString('vi-VN')}</p>
                     </div>
@@ -241,8 +247,8 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                             <div>
                                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Số điện thoại *</label>
                                 <div className="flex gap-2">
-                                    <input type="tel" placeholder="Nhập SĐT..." value={customerPhone} onChange={e => {setCustomerPhone(formatPhone(e.target.value)); setIsCustomerFound(false);}} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" />
-                                    <button type="button" onClick={handleSearchPhone} disabled={isSearchingPhone} className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors flex items-center justify-center min-w-[80px]">
+                                    <input type="tel" placeholder="Nhập SĐT..." value={customerPhone} onChange={e => {setCustomerPhone(formatPhone(e.target.value)); setIsCustomerFound(false);}} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:ring-1 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all" />
+                                    <button type="button" onClick={handleSearchPhone} disabled={isSearchingPhone} className="bg-slate-900 text-white hover:bg-slate-800 px-3.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors flex items-center justify-center min-w-[70px] shadow-xs">
                                         {isSearchingPhone ? '...' : 'Tìm'}
                                     </button>
                                 </div>
@@ -250,9 +256,9 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                             <div>
                                 <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex justify-between items-center">
                                     Tên khách hàng *
-                                    {isCustomerFound && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">Đã có tài khoản</span>}
+                                    {isCustomerFound && <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-bold">Đã có tài khoản</span>}
                                 </label>
-                                <input type="text" placeholder="Nhập tên..." value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" />
+                                <input type="text" placeholder="Nhập tên..." value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:ring-1 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all" />
                             </div>
                         </div>
                     </div>
@@ -265,7 +271,7 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                                 Dịch vụ & Số lượng
                             </h3>
                             <div className="relative">
-                                <button onClick={() => setShowServiceList(!showServiceList)} className="text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                                <button onClick={() => setShowServiceList(!showServiceList)} className="text-xs font-bold bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs">
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                                     Thêm món
                                 </button>
@@ -328,7 +334,7 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                                                         placeholder={item.priceType === 'CONTACT' ? "Nhập giá chốt" : ""}
                                                         value={item.unitPrice}
                                                         onChange={e => handleUpdateItem(item.id, 'unitPrice', e.target.value)}
-                                                        className={`w-full border rounded-lg py-1.5 px-2 text-sm outline-none transition-all ${item.priceType === 'CONTACT' && !item.unitPrice ? 'border-amber-300 bg-amber-50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500' : 'border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'}`}
+                                                        className={`w-full border rounded-lg py-1.5 px-2 text-sm outline-none transition-all ${item.priceType === 'CONTACT' && !item.unitPrice ? 'border-amber-300 bg-amber-50 focus:border-amber-500 focus:ring-1 focus:ring-amber-500' : 'border-slate-200 focus:border-slate-900 focus:ring-1 focus:ring-slate-900'}`}
                                                     />
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-bold text-slate-900">
@@ -359,7 +365,7 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                                 placeholder="Ví dụ: Dặn giặt kỹ, giao trước 17h..." 
                                 value={notes}
                                 onChange={e => setNotes(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:bg-white focus:ring-1 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all resize-none"
                             ></textarea>
                         </div>
                     </div>
@@ -377,7 +383,7 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                                         type="button"
                                         key={v.id}
                                         onClick={() => setVoucherCode(v.code)}
-                                        className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border ${voucherCode === v.code ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-semibold' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+                                        className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border transition-all ${voucherCode === v.code ? 'bg-slate-900 border-slate-900 text-white font-semibold' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'}`}
                                     >
                                         {v.code}
                                     </button>
@@ -389,7 +395,7 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                             value={voucherCode}
                             onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
                             placeholder="Nhập mã giảm giá..."
-                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none uppercase text-slate-900 transition-all"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:bg-white focus:ring-1 focus:ring-slate-900 focus:border-slate-900 outline-none uppercase text-slate-900 transition-all"
                         />
                         {voucherCode && (
                             discountAmount > 0 ? (
@@ -405,6 +411,88 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                         )}
                     </div>
 
+                    {/* Phần 5: Thanh toán tại quầy */}
+                    <div>
+                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-4 flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-xs">5</span>
+                            Thanh toán tại quầy
+                        </h3>
+                        <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200/80 space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-2">Hình thức thanh toán</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <label 
+                                        className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                                            paymentMethod === 'COD' 
+                                                ? 'bg-white border-slate-900 ring-2 ring-slate-900/10 shadow-sm' 
+                                                : 'bg-white/60 border-slate-200 hover:bg-white text-slate-600'
+                                        }`}
+                                    >
+                                        <input 
+                                            type="radio" 
+                                            name="posPaymentMethod" 
+                                            checked={paymentMethod === 'COD'} 
+                                            onChange={() => setPaymentMethod('COD')}
+                                            className="text-slate-900 focus:ring-slate-900"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg">💵</span>
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-900 block">Tiền mặt</span>
+                                                <span className="text-[10px] text-slate-400">Thu trực tiếp tại quầy</span>
+                                            </div>
+                                        </div>
+                                    </label>
+
+                                    <label 
+                                        className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                                            paymentMethod === 'VIETQR' 
+                                                ? 'bg-white border-slate-900 ring-2 ring-slate-900/10 shadow-sm' 
+                                                : 'bg-white/60 border-slate-200 hover:bg-white text-slate-600'
+                                        }`}
+                                    >
+                                        <input 
+                                            type="radio" 
+                                            name="posPaymentMethod" 
+                                            checked={paymentMethod === 'VIETQR'} 
+                                            onChange={() => setPaymentMethod('VIETQR')}
+                                            className="text-slate-900 focus:ring-slate-900"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg">🏦</span>
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-900 block">Chuyển khoản VietQR</span>
+                                                <span className="text-[10px] text-slate-400">Khách quét mã QR</span>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-200/60 flex items-center justify-between">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-900 flex items-center gap-2 cursor-pointer select-none">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={isPaid} 
+                                            onChange={e => setIsPaid(e.target.checked)}
+                                            className="w-4 h-4 text-slate-900 rounded border-slate-300 focus:ring-slate-900 cursor-pointer"
+                                        />
+                                        <span>Đã thu tiền ngay</span>
+                                    </label>
+                                    <p className="text-[11px] text-slate-500 ml-6 mt-0.5">
+                                        {isPaid 
+                                            ? 'Khách thanh toán luôn lúc gửi đồ (Đã thanh toán)' 
+                                            : 'Khách sẽ thanh toán khi lấy lại đồ (Thanh toán sau)'}
+                                    </p>
+                                </div>
+                                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${isPaid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                                    {isPaid ? '✓ Đã thu tiền' : '⏳ Thu khi lấy đồ'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
                 {/* Footer */}
@@ -412,7 +500,7 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                     <div>
                         <div className="text-xs font-semibold text-slate-500 mb-0.5">Tổng SL: {totalQuantity}</div>
                         {discountAmount > 0 && <div className="text-xs font-semibold text-green-600 mb-0.5">Giảm giá: -{formatMoney(discountAmount)}</div>}
-                        <div className="text-xl font-black text-slate-900">Tổng tiền: <span className="text-indigo-600">{formatMoney(totalAmount)}</span></div>
+                        <div className="text-xl font-black text-slate-900">Tổng tiền: <span className="text-slate-900">{formatMoney(totalAmount)}</span></div>
                     </div>
                     <div className="flex gap-3">
                         <button onClick={onClose} type="button" className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 rounded-xl transition-colors">

@@ -29,7 +29,7 @@ public class Order {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_id", nullable = false)
+    @JoinColumn(name = "customer_id", nullable = true)
     private User customer;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -90,8 +90,13 @@ public class Order {
     @Column(length = 20)
     private String receiverPhone;
 
+    /** Địa chỉ trả đồ (Shop giao tận nhà). Đơn cũ có thể dùng chung cho cả 2 chiều. */
     @Column(length = 500)
     private String deliveryAddress;
+
+    /** Địa chỉ nhận đồ (Shop đến lấy tận nơi). */
+    @Column(length = 500)
+    private String pickupAddress;
 
     @Column(length = 1000)
     private String note;
@@ -112,6 +117,15 @@ public class Order {
 
     private Instant paidAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    @Builder.Default
+    private OrderPayoutStatus payoutStatus = OrderPayoutStatus.UNSETTLED;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payout_id")
+    private ShopPayout payout;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -125,6 +139,13 @@ public class Order {
         item.setOrder(this);
     }
     
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean hasDispute = false;
+
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Review review;
+
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Dispute dispute;
 }

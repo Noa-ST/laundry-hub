@@ -22,7 +22,8 @@ public record StatisticsResponseDTO(
 
     public record RevenuePointDTO(
         String label,
-        double revenue
+        double revenue,
+        int orderCount
     ) {}
 
     public record TopServiceDTO(
@@ -43,6 +44,6 @@ public record StatisticsResponseDTO(
     ) {
         public record ChannelBreakdown(int app, int pos) {}
         public record DeliveryBreakdown(int customerDropOff, int shopPickUp, int customerPickUp, int shopDelivery) {}
-        public record PaymentBreakdown(int cash, int vietQr) {}
+        public record PaymentBreakdown(int cash, int vietQr, double cashRevenue, double vietQrRevenue) {}
     }
 }

@@ -4,13 +4,16 @@ import App from './App.jsx'
 import './index.css'
 import { AuthProvider } from './context/AuthContext'
 import { WebSocketProvider } from './context/WebSocketContext'
+import ErrorBoundary from './components/ErrorBoundary'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <AuthProvider>
-      <WebSocketProvider>
-        <App />
-      </WebSocketProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <WebSocketProvider>
+          <App />
+        </WebSocketProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   </React.StrictMode>,
 )
