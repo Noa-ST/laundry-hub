@@ -21,7 +21,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' https://api.mapbox.com; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline' https://api.mapbox.com; img-src 'self' data: blob: https://res.cloudinary.com https://ui-avatars.com https://api.mapbox.com https://images.unsplash.com; connect-src 'self' https://laundry-hub-api.onrender.com wss://laundry-hub-api.onrender.com https://*.onrender.com wss://*.onrender.com https://api.mapbox.com https://events.mapbox.com https://api.cloudinary.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' https://api.mapbox.com; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline' https://api.mapbox.com; img-src 'self' data: blob: https://res.cloudinary.com https://ui-avatars.com https://api.mapbox.com https://images.unsplash.com https://img.vietqr.io https://unpkg.com https://cdn-icons-png.flaticon.com https://*.tile.openstreetmap.org; connect-src 'self' https://laundry-hub-api.onrender.com wss://laundry-hub-api.onrender.com https://*.onrender.com wss://*.onrender.com https://api.mapbox.com https://events.mapbox.com https://api.cloudinary.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';"
         }
       ]
     }
