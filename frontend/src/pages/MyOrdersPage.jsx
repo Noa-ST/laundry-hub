@@ -281,12 +281,12 @@ const MyOrdersPage = () => {
                                                         <p className="font-bold text-slate-900 text-xs">{order.receiverName} <span className="font-normal text-slate-400 mx-1">•</span> {order.receiverPhone}</p>
                                                         {order.inboundType === 'SHOP_PICK_UP' && (
                                                             <p className="text-slate-600 text-[11px] line-clamp-2 leading-relaxed">
-                                                                <span className="font-semibold text-slate-700">📍 Lấy đồ:</span> {order.pickupAddress || order.deliveryAddress}
+                                                                <span className="font-semibold text-slate-700">Lấy đồ:</span> {order.pickupAddress || order.deliveryAddress}
                                                             </p>
                                                         )}
                                                         {order.outboundType === 'SHOP_DELIVERY' && (
                                                             <p className="text-slate-600 text-[11px] line-clamp-2 leading-relaxed">
-                                                                <span className="font-semibold text-slate-700">📦 Trả đồ:</span> {order.deliveryAddress}
+                                                                <span className="font-semibold text-slate-700">Trả đồ:</span> {order.deliveryAddress}
                                                             </p>
                                                         )}
                                                     </div>

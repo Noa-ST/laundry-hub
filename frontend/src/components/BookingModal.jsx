@@ -723,7 +723,7 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
                                     {/* Contact Person Details */}
                                     <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
                                         <h4 className="font-bold text-slate-800 mb-3 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                                            <span>👤 Thông tin người liên hệ</span>
+                                            <span>Thông tin người liên hệ</span>
                                         </h4>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div>
@@ -877,7 +877,7 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
                             {/* Appointment Time Selection */}
                             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
                                 <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                                    <span>📅 Thời gian hẹn gửi/nhận</span>
+                                    <span>Thời gian hẹn gửi/nhận</span>
                                 </h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
@@ -913,7 +913,7 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
                             {/* Additional Notes */}
                             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
                                 <label className="block font-bold text-slate-800 text-xs uppercase tracking-wider mb-2">
-                                    📝 Ghi chú cho tiệm (Tùy chọn)
+                                    Ghi chú cho tiệm (Tùy chọn)
                                 </label>
                                 <textarea 
                                     value={note} 
@@ -932,7 +932,7 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
                             {/* Payment Method Selector */}
                             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
                                 <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                                    <span>💳 Phương thức thanh toán</span>
+                                    <span>Phương thức thanh toán</span>
                                 </h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <label 
@@ -991,7 +991,7 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
                             {/* Voucher & Discounts */}
                             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
                                 <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center justify-between">
-                                    <span>🎟️ Mã Giảm Giá (Tùy chọn)</span>
+                                    <span>Mã Giảm Giá (Tùy chọn)</span>
                                     {voucherCode && (
                                         <button 
                                             type="button" 
@@ -1023,7 +1023,7 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
                                                                 : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50')
                                                     }`}
                                                 >
-                                                    {isCompensation ? `🎁 ${v.code} (Đền bù ${formatMoney(v.discountValue)})` : v.code}
+                                                    {isCompensation ? `${v.code} (Đền bù ${formatMoney(v.discountValue)})` : v.code}
                                                 </button>
                                             );
                                         })}
@@ -1059,7 +1059,7 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
                             {/* Order Review & Items Breakdown */}
                             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
                                 <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center justify-between">
-                                    <span>📋 Tóm tắt đơn hàng</span>
+                                    <span>Tóm tắt đơn hàng</span>
                                     <button 
                                         type="button" 
                                         onClick={() => setCurrentStep(1)} 
@@ -1110,7 +1110,7 @@ const BookingModal = ({ shop, location, isOpen, onClose, onSuccess }) => {
                                     <div className="flex justify-between">
                                         <span className="text-slate-600 font-medium">Thanh toán:</span>
                                         <span className="font-bold text-slate-900">
-                                            {paymentMethod === 'VIETQR' ? '🏦 Chuyển khoản VietQR' : '💵 Tiền mặt (COD)'}
+                                            {paymentMethod === 'VIETQR' ? 'Chuyển khoản VietQR' : 'Tiền mặt (COD)'}
                                         </span>
                                     </div>
                                     {note && (

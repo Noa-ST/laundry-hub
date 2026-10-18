@@ -125,12 +125,12 @@ const OrderDetailModal = ({ isOpen, onClose, order, formatMoney, renderActions, 
                                 <div className="mt-3 pt-3 border-t border-slate-200/60 space-y-1.5">
                                     {order.inboundType === 'SHOP_PICK_UP' && (
                                         <p className="text-xs text-slate-600 leading-relaxed">
-                                            <span className="font-semibold text-slate-800">📍 Lấy đồ tại:</span> {order.pickupAddress || order.deliveryAddress}
+                                            <span className="font-semibold text-slate-800">Lấy đồ tại:</span> {order.pickupAddress || order.deliveryAddress}
                                         </p>
                                     )}
                                     {order.outboundType === 'SHOP_DELIVERY' && (
                                         <p className="text-xs text-slate-600 leading-relaxed">
-                                            <span className="font-semibold text-slate-800">📦 Giao đồ tại:</span> {order.deliveryAddress}
+                                            <span className="font-semibold text-slate-800">Giao đồ tại:</span> {order.deliveryAddress}
                                         </p>
                                     )}
                                 </div>

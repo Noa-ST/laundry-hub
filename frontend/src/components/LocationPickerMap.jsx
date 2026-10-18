@@ -366,7 +366,7 @@ const LocationPickerMap = ({
                 {MAPBOX_TOKEN && (
                     <div className="absolute top-2 left-2 bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-slate-200/60 shadow-sm z-10 pointer-events-none">
                         <p className="text-[10px] font-semibold text-slate-700 flex items-center gap-1">
-                            <span>📍</span> Kéo thả ghim hoặc click trên bản đồ để chọn tọa độ
+                            Kéo thả ghim hoặc click trên bản đồ để chọn tọa độ
                         </p>
                     </div>
                 )}

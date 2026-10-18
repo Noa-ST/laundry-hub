@@ -436,7 +436,6 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                                             className="text-slate-900 focus:ring-slate-900"
                                         />
                                         <div className="flex items-center gap-2">
-                                            <span className="text-lg">💵</span>
                                             <div>
                                                 <span className="text-xs font-bold text-slate-900 block">Tiền mặt</span>
                                                 <span className="text-[10px] text-slate-400">Thu trực tiếp tại quầy</span>
@@ -459,7 +458,6 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                                             className="text-slate-900 focus:ring-slate-900"
                                         />
                                         <div className="flex items-center gap-2">
-                                            <span className="text-lg">🏦</span>
                                             <div>
                                                 <span className="text-xs font-bold text-slate-900 block">Chuyển khoản VietQR</span>
                                                 <span className="text-[10px] text-slate-400">Khách quét mã QR</span>

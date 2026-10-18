@@ -20,7 +20,7 @@ import { handleGeolocationError, GEOLOCATION_OPTIONS } from '../utils/geoUtils';
 const OwnerDashboardPage = () => {
     const [shopData, setShopData] = useState(null);
     const [hasShop, setHasShop] = useState(false);
-    const [mainTab, setMainTab] = useState('statistics'); // 'statistics', 'orders', 'services', 'machines', 'settings'
+    const [mainTab, setMainTab] = useState('orders'); // 'orders', 'statistics', 'services', 'machines', 'vouchers', 'payouts', 'disputes', 'settings'
     const { notification } = useWebSocket();
 
     // Orders State
@@ -338,6 +338,22 @@ const OwnerDashboardPage = () => {
 
     const formatMoney = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val || 0);
 
+    const formatDateTime = (dateStr) => {
+        if (!dateStr) return '--';
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            const hours = String(d.getHours()).padStart(2, '0');
+            const mins = String(d.getMinutes()).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            return `${hours}:${mins} ${day}/${month}/${year}`;
+        } catch (e) {
+            return dateStr;
+        }
+    };
+
     const filteredOrders = orders;
 
     const tabs = [
@@ -528,32 +544,44 @@ const OwnerDashboardPage = () => {
                     </div>
                 </div>
 
-                <div className="max-w-6xl mx-auto flex space-x-2 overflow-x-auto custom-scrollbar pb-0">
+                <div className="max-w-6xl mx-auto flex items-center space-x-1 sm:space-x-2 overflow-x-auto custom-scrollbar pb-0">
                     {[
-                        { id: 'statistics', label: 'Thống kê' },
-                        { id: 'orders', label: 'Đơn hàng' },
-                        { id: 'payouts', label: 'Ví & Giải ngân' },
-                        { id: 'disputes', label: 'Khiếu nại & Bồi thường' },
-                        { id: 'vouchers', label: 'Mã Giảm Giá' },
-                        { id: 'services', label: 'Dịch vụ & Bảng giá' },
-                        { id: 'machines', label: 'Máy giặt & Sấy' },
-                        { id: 'settings', label: 'Thông tin Tiệm' }
-                    ].map(t => (
-                        <button
-                            key={t.id}
-                            onClick={() => handleTabClick(t.id)}
-                            className={`pb-3 px-3 text-sm whitespace-nowrap transition-all duration-300 relative ${
-                                mainTab === t.id 
-                                ? 'text-slate-900 font-bold' 
-                                : 'text-slate-500 hover:text-slate-900 font-medium'
-                            } ${!hasShop && t.id !== 'settings' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            {t.label}
-                            {mainTab === t.id && (
-                                <div className="absolute bottom-0 left-0 w-full h-[3px] bg-slate-900 rounded-t-full"></div>
-                            )}
-                        </button>
-                    ))}
+                        { id: 'orders', label: 'Đơn hàng', group: 1, badge: summary?.pendingCount > 0 ? summary.pendingCount : null },
+                        { id: 'statistics', label: 'Thống kê', group: 1 },
+                        { id: 'services', label: 'Dịch vụ & Bảng giá', group: 2 },
+                        { id: 'machines', label: 'Máy giặt & Sấy', group: 2 },
+                        { id: 'vouchers', label: 'Mã Giảm Giá', group: 2 },
+                        { id: 'payouts', label: 'Ví & Giải ngân', group: 3 },
+                        { id: 'disputes', label: 'Khiếu nại & Bồi thường', group: 3 },
+                        { id: 'settings', label: 'Thông tin Tiệm', group: 4 }
+                    ].map((t, index, arr) => {
+                        const showDivider = index > 0 && t.group !== arr[index - 1].group;
+                        return (
+                            <React.Fragment key={t.id}>
+                                {showDivider && (
+                                    <div className="h-4 w-px bg-slate-200/80 mx-1 shrink-0 hidden md:block" />
+                                )}
+                                <button
+                                    onClick={() => handleTabClick(t.id)}
+                                    className={`pb-3 px-3 text-sm whitespace-nowrap transition-all duration-200 relative inline-flex items-center gap-1.5 ${
+                                        mainTab === t.id 
+                                        ? 'text-slate-900 font-bold' 
+                                        : 'text-slate-500 hover:text-slate-900 font-medium'
+                                    } ${!hasShop && t.id !== 'settings' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <span>{t.label}</span>
+                                    {t.badge && (
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-tight min-w-[18px] text-center shadow-xs">
+                                            {t.badge}
+                                        </span>
+                                    )}
+                                    {mainTab === t.id && (
+                                        <div className="absolute bottom-0 left-0 w-full h-[3px] bg-slate-900 rounded-t-full"></div>
+                                    )}
+                                </button>
+                            </React.Fragment>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -639,11 +667,11 @@ const OwnerDashboardPage = () => {
                                     <table className="w-full text-left border-collapse min-w-[850px]">
                                         <thead>
                                             <tr className="border-b border-slate-200 bg-slate-50/90 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                                <th className="py-3.5 px-4 pl-6 w-[20%] whitespace-nowrap">Đơn Hàng</th>
-                                                <th className="py-3.5 px-4 w-[28%]">Khách Hàng</th>
-                                                <th className="py-3.5 px-4 w-[18%] text-left">Tổng Tiền</th>
-                                                <th className="py-3.5 px-4 w-[16%] text-center">Trạng Thái</th>
-                                                <th className="py-3.5 px-4 pr-6 w-[18%] text-right">Hành Động</th>
+                                                <th className="py-3 px-4 pl-6 w-[20%] whitespace-nowrap">Đơn Hàng</th>
+                                                <th className="py-3 px-4 w-[24%]">Khách Hàng</th>
+                                                <th className="py-3 px-4 w-[20%] text-left">Tổng Tiền</th>
+                                                <th className="py-3 px-4 w-[16%] text-center">Trạng Thái</th>
+                                                <th className="py-3 px-4 pr-6 w-[20%] text-right">Hành Động</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 text-sm">
@@ -651,59 +679,49 @@ const OwnerDashboardPage = () => {
                                                 <tr 
                                                     key={order.id} 
                                                     className={`transition-colors border-b border-slate-100 last:border-0 ${
-                                                        idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
+                                                        idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'
                                                     } hover:bg-teal-50/30`}
                                                 >
-                                                    <td className="py-3.5 px-4 pl-6 align-middle whitespace-nowrap">
+                                                    <td className="py-3 px-4 pl-6 align-middle whitespace-nowrap">
                                                         <div className="flex items-center gap-2">
                                                             <span className="font-mono font-bold text-slate-900 bg-slate-100 border border-slate-200/80 inline-block px-2 py-0.5 rounded text-xs shrink-0">
                                                                 #{order.id}
                                                             </span>
-                                                            <span className="text-[11px] font-medium text-slate-500 whitespace-nowrap">
-                                                                {new Date(order.bookingTime).toLocaleString('vi-VN')}
+                                                            <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+                                                                {formatDateTime(order.bookingTime)}
                                                             </span>
                                                         </div>
                                                     </td>
-                                                    <td className="py-3.5 px-4 align-middle">
-                                                        <div className="flex flex-col">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="font-bold text-slate-900">{order.receiverName || 'Khách vãng lai'}</span>
-                                                                <span className="text-xs text-slate-500">({order.receiverPhone || '--'})</span>
-                                                            </div>
-                                                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                                                <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 whitespace-nowrap">
-                                                                    {order.inboundType === 'CUSTOMER_DROP_OFF' ? 'Nhận: Khách mang tới' : 'Nhận: Tiệm đi lấy'}
-                                                                </span>
-                                                                <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 whitespace-nowrap">
-                                                                    {order.outboundType === 'CUSTOMER_PICK_UP' ? 'Trả: Khách tự lấy' : 'Trả: Tiệm đi giao'}
-                                                                </span>
-                                                            </div>
+                                                    <td className="py-3 px-4 align-middle whitespace-nowrap">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-bold text-slate-900 text-sm">{order.receiverName || 'Khách vãng lai'}</span>
+                                                            <span className="text-xs text-slate-500 font-mono">({order.receiverPhone || '--'})</span>
                                                         </div>
                                                     </td>
-                                                    <td className="py-3.5 px-4 align-middle whitespace-nowrap text-left">
-                                                        <div className="flex flex-col gap-1 items-start">
-                                                            <span className="font-bold text-slate-900 text-[14px] tracking-tight">
+                                                    <td className="py-3 px-4 align-middle whitespace-nowrap text-left">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-bold text-slate-900 text-sm tracking-tight">
                                                                 {formatMoney(order.finalTotalPrice)}
                                                             </span>
                                                             {order.paymentStatus === 'PAID' ? (
-                                                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md inline-flex items-center gap-1 border bg-emerald-50 border-emerald-200 text-emerald-700">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded inline-flex items-center gap-1 border bg-emerald-50 border-emerald-200 text-emerald-700">
                                                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                                                                    Đã Thanh Toán
+                                                                    Đã thanh toán
                                                                 </span>
                                                             ) : (
-                                                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md inline-flex items-center gap-1 border bg-amber-50 border-amber-200 text-amber-700">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded inline-flex items-center gap-1 border bg-amber-50 border-amber-200 text-amber-700">
                                                                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
-                                                                    Chưa Thanh Toán
+                                                                    Chưa thanh toán
                                                                 </span>
                                                             )}
                                                         </div>
                                                     </td>
-                                                    <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
+                                                    <td className="py-3 px-4 align-middle text-center whitespace-nowrap">
                                                         <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded border ${getStatusStyle(order.status)}`}>
                                                             {getStatusText(order.status)}
                                                         </span>
                                                     </td>
-                                                    <td className="py-3.5 px-4 pr-6 align-middle whitespace-nowrap">
+                                                    <td className="py-3 px-4 pr-6 align-middle whitespace-nowrap">
                                                         {renderActionButtons(order, true)}
                                                     </td>
                                                 </tr>

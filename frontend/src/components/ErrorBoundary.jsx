@@ -47,13 +47,13 @@ class ErrorBoundary extends React.Component {
                                 onClick={this.handleReload}
                                 className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl text-xs transition-all shadow-sm"
                             >
-                                🔄 Tải lại trang
+                                Tải lại trang
                             </button>
                             <button
                                 onClick={this.handleGoHome}
                                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 px-4 rounded-xl text-xs transition-all"
                             >
-                                🏠 Trang chủ
+                                Trang chủ
                             </button>
                         </div>
                     </div>
