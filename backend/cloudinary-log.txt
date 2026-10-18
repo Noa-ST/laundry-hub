@@ -1,6 +1,0 @@
-2026-10-08T19:42:16.582628400 - URL to delete: https://res.cloudinary.com/dblw5v3br/image/upload/v1791463320/jl81xymio3fpl3sye1e0.jpg -> Extracted publicId: jl81xymio3fpl3sye1e0
-2026-10-08T19:42:16.585681400 - Attempting to delete Cloudinary image: jl81xymio3fpl3sye1e0
-2026-10-08T19:42:17.826609400 - Failed to delete Cloudinary image: jl81xymio3fpl3sye1e0 - Error: Invalid Signature 483bee35637ef71079a024d2abb8a3dc22721e16. String to sign - 'invalidate=false&public_id=jl81xymio3fpl3sye1e0&timestamp=1791463336'.
-2026-10-08T19:47:01.562868100 - URL to delete: https://res.cloudinary.com/dblw5v3br/image/upload/v1791463613/xhvfp9iqptnybqbdbcwl.jpg -> Extracted publicId: xhvfp9iqptnybqbdbcwl
-2026-10-08T19:47:01.576156900 - Attempting to delete Cloudinary image: xhvfp9iqptnybqbdbcwl
-2026-10-08T19:47:03.005994 - Cloudinary delete result for xhvfp9iqptnybqbdbcwl: ok
