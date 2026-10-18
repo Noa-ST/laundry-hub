@@ -17,13 +17,23 @@ import java.util.UUID;
 @Slf4j
 public class JwtUtils {
 
-    // Bắt buộc cấu hình qua biến môi trường APP_JWTSECRET (chuỗi Base64, tối thiểu 32 byte).
-    // KHÔNG đặt giá trị mặc định: thiếu secret thì ứng dụng phải dừng khởi động thay vì ký token bằng key công khai.
-    @Value("${app.jwtSecret}")
+    // Tuyệt đối không hardcode secret trong source code.
+    // Giá trị được nạp từ biến môi trường APP_JWTSECRET trên server hoặc app.jwtSecret trong file application.yml nội bộ.
+    @Value("${app.jwtSecret:${APP_JWTSECRET:}}")
     private String jwtSecret;
 
     @Value("${app.jwtExpirationMs:1800000}") // 30 minutes
     private int jwtExpirationMs;
+
+    @jakarta.annotation.PostConstruct
+    public void validateSecret() {
+        if (jwtSecret == null || jwtSecret.trim().isEmpty()) {
+            throw new IllegalStateException(
+                "❌ LỖI KHỞI ĐỘNG: Chưa cấu hình biến môi trường APP_JWTSECRET (hoặc app.jwtSecret). " +
+                "Vui lòng thiết lập biến môi trường APP_JWTSECRET trên Render Dashboard trước khi khởi chạy ứng dụng!"
+            );
+        }
+    }
 
     private Key key() {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
