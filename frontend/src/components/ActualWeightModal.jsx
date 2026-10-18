@@ -36,7 +36,7 @@ const ActualWeightModal = ({ orderId, isOpen, onClose, onSuccess }) => {
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 bg-gray-50 rounded-full w-7 h-7 flex items-center justify-center">✕</button>
                 <div className="flex flex-col items-center">
                     <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-3">
-                        <span className="text-2xl">⚖️</span>
+                        <span className="text-sm font-bold text-purple-700">KG</span>
                     </div>
                     <h3 className="font-bold text-lg mb-1 text-gray-800 text-center">Nhập Cân Nặng</h3>
                     <p className="text-xs text-gray-500 mb-5 text-center">Đơn hàng #{orderId}</p>

@@ -993,7 +993,11 @@ const OwnerDashboardPage = () => {
                 order={selectedOrder}
                 formatMoney={formatMoney}
                 renderActions={(order, isTableMode = false, isModalMode = true) => renderActionButtons(order, isTableMode, isModalMode)}
-                onUpdateSuccess={() => {
+                onUpdateSuccess={(updatedOrder) => {
+                    if (updatedOrder) {
+                        setSelectedOrder(updatedOrder);
+                        setOrders(prev => prev.map(o => o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o));
+                    }
                     fetchDashboardData();
                 }}
                 onViewDispute={handleViewDispute}

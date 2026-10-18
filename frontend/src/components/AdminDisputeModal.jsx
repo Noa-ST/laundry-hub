@@ -154,7 +154,9 @@ const AdminDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-purple-50 to-white">
                     <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
-                            ⚖️
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                            </svg>
                         </div>
                         <div>
                             <h3 className="text-base font-bold text-slate-900">
@@ -263,11 +265,11 @@ const AdminDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                     <span className="text-slate-500">Hình thức bồi thường:</span>{' '}
                                     {dispute.refundMethod === 'VOUCHER' ? (
                                         <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded text-[11px]">
-                                            🎟️ Voucher giảm giá: <code className="font-mono">{dispute.compensationVoucherCode}</code>
+                                            Voucher giảm giá: <code className="font-mono">{dispute.compensationVoucherCode}</code>
                                         </span>
                                     ) : (
                                         <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[11px]">
-                                            🏦 Chuyển khoản VietQR
+                                            Chuyển khoản VietQR
                                         </span>
                                     )}
                                 </p>
@@ -360,7 +362,7 @@ const AdminDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                                 }`}
                                             >
                                                 <div className="flex items-center space-x-2">
-                                                    <span className="text-lg">🏦</span>
+                                                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">VietQR</span>
                                                     <div>
                                                         <h5 className="text-xs font-bold text-slate-900">Phương án 1: Chuyển khoản VietQR</h5>
                                                         <p className="text-[10px] text-slate-500 mt-0.5">Quét QR chuyển ngay theo STK khách</p>
@@ -377,7 +379,7 @@ const AdminDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                                 }`}
                                             >
                                                 <div className="flex items-center space-x-2">
-                                                    <span className="text-lg">🎟️</span>
+                                                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700">Voucher</span>
                                                     <div>
                                                         <h5 className="text-xs font-bold text-slate-900">Phương án 2: Bồi hoàn bằng Voucher</h5>
                                                         <p className="text-[10px] text-slate-500 mt-0.5">Tự động cấp voucher cho lần giặt sau</p>
@@ -454,7 +456,7 @@ const AdminDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                                 </div>
                                             ) : (
                                                 <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-800">
-                                                    ⚠️ Khách hàng chưa cung cấp STK trong đơn khiếu nại. Admin có thể chọn <strong>Phương án 2 (Bồi hoàn bằng Voucher)</strong> cho khách.
+                                                    Khách hàng chưa cung cấp STK trong đơn khiếu nại. Admin có thể chọn <strong>Phương án 2 (Bồi hoàn bằng Voucher)</strong> cho khách.
                                                 </div>
                                             )}
 
@@ -505,7 +507,7 @@ const AdminDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                     {refundMethod === 'VOUCHER' && (
                                         <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-300/80 space-y-2.5 animate-fade-in">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-xl">🎁</span>
+                                                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                                                 <h5 className="text-xs font-black text-amber-900 uppercase">
                                                     Phán quyết cấp Voucher đền bù (Khấu trừ tiệm)
                                                 </h5>
@@ -514,7 +516,7 @@ const AdminDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                                 Admin phê duyệt cấp một mã Voucher trị giá <strong className="text-rose-600 font-bold">{dispute.requestedAmount ? Number(dispute.requestedAmount).toLocaleString('vi-VN') + ' đ' : '0 đ'}</strong> (mã <code>ADMIN-REFUND-{dispute.orderId}-XXXX</code>) vào ví của khách hàng.
                                             </p>
                                             <div className="p-2.5 bg-white/80 rounded-lg border border-amber-200 text-[11px] text-amber-900 space-y-1.5">
-                                                <p className="font-semibold text-amber-950">📌 Trách nhiệm chi phí:</p>
+                                                <p className="font-semibold text-amber-950">Trách nhiệm chi phí:</p>
                                                 <p>• Mã chỉ áp dụng tại chính tiệm giặt gây ra lỗi trong 90 ngày. Chi phí này <strong>do tiệm chịu và được khấu trừ vào doanh thu</strong> của tiệm ở đơn tiếp theo của khách.</p>
                                                 <p>• Phương án này áp dụng khi hai bên đồng thuận bù đắp dịch vụ hoặc shop không thể chuyển khoản kịp thời.</p>
                                             </div>

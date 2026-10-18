@@ -67,7 +67,7 @@ const ShopCard = ({ shop, location }) => {
         // Show minimal toast instead of alert if possible, or keep alert. Let's use standard alert for now
         // wait, prompt says "Hiển thị Toast thông báo tinh gọn."
         // We might not have a toast system, but let's just stick to alert or if there is a toast, use it.
-        toast.success("🎉 Đặt lịch thành công!");
+        toast.success("Đặt lịch thành công!");
         window.location.hash = 'orders';
     };
 

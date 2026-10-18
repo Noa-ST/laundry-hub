@@ -4,10 +4,10 @@ import { useWebSocket } from '../context/WebSocketContext';
 import toast from 'react-hot-toast';
 
 const SUPPORT_STATUS_MAP = {
-    OPEN: { label: 'Đang mở', icon: '🟢', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    IN_PROGRESS: { label: 'Đang xử lý', icon: '🟡', badgeClass: 'bg-amber-50 text-amber-700 border-amber-200' },
-    RESOLVED: { label: 'Đã giải quyết', icon: '✅', badgeClass: 'bg-teal-50 text-teal-700 border-teal-200' },
-    CLOSED: { label: 'Đã đóng', icon: '⚪', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' }
+    OPEN: { label: 'Đang mở', icon: '', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    IN_PROGRESS: { label: 'Đang xử lý', icon: '', badgeClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+    RESOLVED: { label: 'Đã giải quyết', icon: '', badgeClass: 'bg-teal-50 text-teal-700 border-teal-200' },
+    CLOSED: { label: 'Đã đóng', icon: '', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' }
 };
 
 const AdminSupportTab = () => {
@@ -248,7 +248,7 @@ const AdminSupportTab = () => {
                         </div>
                     ) : filteredConversations.length === 0 ? (
                         <div className="p-8 text-center text-slate-400 text-sm">
-                            <div className="text-3xl mb-2">💬</div>
+                            <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Hỗ trợ trực tuyến</div>
                             Chưa có cuộc trò chuyện nào
                         </div>
                     ) : (
@@ -356,10 +356,10 @@ const AdminSupportTab = () => {
                                     <div className="text-[11px] text-slate-500 flex items-center gap-3">
                                         {selectedConv.userPhone && (
                                             <a href={`tel:${selectedConv.userPhone}`} className="hover:text-indigo-600 hover:underline">
-                                                📞 {selectedConv.userPhone}
+                                                {selectedConv.userPhone}
                                             </a>
                                         )}
-                                        {selectedConv.userEmail && <span>✉️ {selectedConv.userEmail}</span>}
+                                        {selectedConv.userEmail && <span>{selectedConv.userEmail}</span>}
                                     </div>
                                 </div>
                             </div>
@@ -371,10 +371,10 @@ const AdminSupportTab = () => {
                                     onChange={(e) => handleUpdateStatus(e.target.value)}
                                     className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-xl outline-none cursor-pointer"
                                 >
-                                    <option value="OPEN">🟢 Đang mở</option>
-                                    <option value="IN_PROGRESS">🟡 Đang xử lý</option>
-                                    <option value="RESOLVED">✅ Đã giải quyết</option>
-                                    <option value="CLOSED">⚪ Đã đóng</option>
+                                    <option value="OPEN">Đang mở</option>
+                                    <option value="IN_PROGRESS">Đang xử lý</option>
+                                    <option value="RESOLVED">Đã giải quyết</option>
+                                    <option value="CLOSED">Đã đóng</option>
                                 </select>
                             </div>
                         </div>
@@ -414,7 +414,7 @@ const AdminSupportTab = () => {
                                                 }`}>
                                                     <div className="flex items-center justify-between gap-3 mb-1">
                                                         <span className={`font-bold text-[10px] ${isAdmin ? 'text-indigo-200' : 'text-slate-500'}`}>
-                                                            {isAdmin ? '🛡️ CSKH Admin' : msg.senderName}
+                                                            {isAdmin ? 'CSKH Admin' : msg.senderName}
                                                         </span>
                                                         <span className={`text-[10px] ${isAdmin ? 'text-indigo-200' : 'text-slate-400'}`}>
                                                             {formatDateTime(msg.createdAt)}
@@ -474,7 +474,7 @@ const AdminSupportTab = () => {
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400">
                         <div className="w-16 h-16 rounded-2xl bg-slate-200/60 flex items-center justify-center text-3xl mb-3 shadow-inner">
-                            🎧
+                            
                         </div>
                         <h4 className="font-bold text-slate-700 text-base mb-1">Kênh CSKH Trực Tuyến</h4>
                         <p className="text-xs max-w-sm text-slate-400">

@@ -2,6 +2,7 @@ package com.laundry.service.impl;
 
 import com.laundry.dto.request.CreatePosOrderRequestDTO;
 import com.laundry.dto.request.InspectOrderRequestDTO;
+import com.laundry.dto.request.UpdateOrderItemsRequestDTO;
 import com.laundry.dto.request.PosOrderItemRequestDTO;
 import com.laundry.dto.request.UpdateOrderStatusRequestDTO;
 import com.laundry.dto.response.OrderItemResponseDTO;
@@ -234,8 +235,12 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
     public OrderResponseDTO inspectOrder(Long ownerId, Long orderId, InspectOrderRequestDTO request) {
         Order order = getOrderAndValidateOwner(ownerId, orderId);
         
-        if (order.getStatus() != OrderStatus.RECEIVED) {
-            throw new BadRequestException("Chỉ được cập nhật cân nặng/số lượng thực tế (inspect) khi đơn ở trạng thái RECEIVED.");
+        if (order.getStatus() == OrderStatus.PROCESSING ||
+            order.getStatus() == OrderStatus.READY ||
+            order.getStatus() == OrderStatus.DELIVERING ||
+            order.getStatus() == OrderStatus.COMPLETED ||
+            order.getStatus() == OrderStatus.CANCELLED) {
+            throw new BadRequestException("Không thể cập nhật cân nặng/số lượng khi đơn đã bắt đầu giặt hoặc đã hoàn tất.");
         }
 
         order.setActualWeight(request.actualWeight());
@@ -293,6 +298,66 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
         order.setServiceFee(newServiceFee);
         order.setFinalTotalPrice(finalTotal);
         order.setActualTotalPrice(order.getFinalTotalPrice());
+        
+        return mapToDTO(orderRepository.save(order));
+    }
+
+    @Override
+    @Transactional
+    public OrderResponseDTO updateOrderItems(Long ownerId, Long orderId, UpdateOrderItemsRequestDTO request) {
+        Order order = getOrderAndValidateOwner(ownerId, orderId);
+
+        if (order.getStatus() == OrderStatus.PROCESSING ||
+            order.getStatus() == OrderStatus.READY ||
+            order.getStatus() == OrderStatus.DELIVERING ||
+            order.getStatus() == OrderStatus.COMPLETED ||
+            order.getStatus() == OrderStatus.CANCELLED) {
+            throw new BadRequestException("Không thể điều chỉnh số lượng khi đơn đã bắt đầu giặt hoặc đã hoàn tất.");
+        }
+
+        for (var itemUpdate : request.items()) {
+            if (itemUpdate.itemId() == null || itemUpdate.quantity() == null || itemUpdate.quantity() < 0) {
+                continue;
+            }
+            for (OrderItem item : order.getItems()) {
+                if (item.getId().equals(itemUpdate.itemId())) {
+                    item.setQuantity(itemUpdate.quantity());
+                    break;
+                }
+            }
+        }
+
+        BigDecimal newServiceFee = BigDecimal.ZERO;
+        for (OrderItem item : order.getItems()) {
+            BigDecimal lineTotal = item.getPriceAtBooking().multiply(BigDecimal.valueOf(item.getQuantity()));
+            
+            if (item.getService().getMinCharge() != null && item.getService().getMinCharge() > 0) {
+                BigDecimal minCharge = BigDecimal.valueOf(item.getService().getMinCharge());
+                if (lineTotal.compareTo(minCharge) < 0) {
+                    lineTotal = minCharge;
+                }
+            }
+            
+            newServiceFee = newServiceFee.add(lineTotal);
+        }
+        
+        BigDecimal discountAmount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
+        if (order.getVoucher() != null) {
+            BigDecimal preDiscountTotal = newServiceFee.add(order.getShippingFee() != null ? order.getShippingFee() : BigDecimal.ZERO);
+            Double discount = order.getVoucher().calculateDiscount(preDiscountTotal.doubleValue());
+            discountAmount = BigDecimal.valueOf(discount);
+            order.setDiscountAmount(discountAmount);
+        }
+        
+        BigDecimal preDiscountTotal = newServiceFee.add(order.getShippingFee() != null ? order.getShippingFee() : BigDecimal.ZERO);
+        BigDecimal finalTotal = preDiscountTotal.subtract(discountAmount);
+        if (finalTotal.compareTo(BigDecimal.ZERO) < 0) {
+            finalTotal = BigDecimal.ZERO;
+        }
+        
+        order.setServiceFee(newServiceFee);
+        order.setFinalTotalPrice(finalTotal);
+        order.setActualTotalPrice(finalTotal);
         
         return mapToDTO(orderRepository.save(order));
     }

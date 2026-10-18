@@ -62,7 +62,7 @@ const AdminDisputeTab = () => {
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                        <span>⚖️</span> Quản Lý & Phán Quyết Tranh Chấp
+                        Quản Lý & Phán Quyết Tranh Chấp
                     </h2>
                     <p className="text-xs text-slate-500 mt-0.5">
                         Xử lý các đơn khiếu nại bồi thường phát sinh giữa Khách hàng và Chủ tiệm giặt
@@ -95,7 +95,7 @@ const AdminDisputeTab = () => {
             ) : disputes.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
                     <div className="w-12 h-12 mx-auto rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mb-3 text-xl">
-                        ✨
+                        
                     </div>
                     <h3 className="text-sm font-bold text-slate-800">Không có tranh chấp nào</h3>
                     <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">

@@ -215,7 +215,7 @@ const AdminPayoutTab = () => {
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tiền VietQR Sàn Đang Giữ</span>
-                        <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-bold">🏦</div>
+                        <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold">TK</div>
                     </div>
                     <div className="text-2xl font-black text-slate-900">{formatMoney(stats?.holdingBalance)}</div>
                     <p className="text-xs text-slate-400 mt-1">Từ các đơn hoàn thành chưa vào đợt</p>
@@ -224,7 +224,7 @@ const AdminPayoutTab = () => {
                 <div className="bg-white p-5 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Cần Giải Ngân Đợt Này</span>
-                        <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold">⏳</div>
+                        <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">WAIT</div>
                     </div>
                     <div className="text-2xl font-black text-amber-700">{formatMoney(stats?.pendingPayoutAmount)}</div>
                     <p className="text-xs text-amber-600/80 mt-1">{stats?.pendingBatchesCount || 0} đợt đang chờ thanh toán</p>
@@ -233,7 +233,11 @@ const AdminPayoutTab = () => {
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Đã Giải Ngân Thành Công</span>
-                        <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold">✓</div>
+                        <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <svg className="w-4 h-4 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
                     </div>
                     <div className="text-2xl font-black text-emerald-600">{formatMoney(stats?.completedPayoutAmount)}</div>
                     <p className="text-xs text-slate-400 mt-1">Tổng tiền đã chuyển về các tiệm</p>
@@ -242,7 +246,7 @@ const AdminPayoutTab = () => {
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hoa Hồng Sàn Đã Thu</span>
-                        <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">💰</div>
+                        <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">VND</div>
                     </div>
                     <div className="text-2xl font-black text-indigo-600">{formatMoney(stats?.totalPlatformFee)}</div>
                     <p className="text-xs text-slate-400 mt-1">Lợi nhuận chiết khấu sàn giữ lại</p>
@@ -338,7 +342,7 @@ const AdminPayoutTab = () => {
                                                 </div>
                                             ) : (
                                                 <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200">
-                                                    ⚠️ Chưa cài đặt STK
+                                                    Chưa cài đặt STK
                                                 </span>
                                             )}
                                         </td>
@@ -366,17 +370,17 @@ const AdminPayoutTab = () => {
                                         <td className="p-4 text-center">
                                             {p.status === 'PENDING' && (
                                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
-                                                    ⏳ Chờ giải ngân
+                                                    Chờ giải ngân
                                                 </span>
                                             )}
                                             {p.status === 'COMPLETED' && (
                                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">
-                                                    ✓ Đã giải ngân
+                                                    Đã giải ngân
                                                 </span>
                                             )}
                                             {p.status === 'REJECTED' && (
                                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-100 px-2.5 py-1 rounded-full">
-                                                    ✕ Đã hủy
+                                                    Đã hủy
                                                 </span>
                                             )}
                                         </td>
@@ -430,7 +434,7 @@ const AdminPayoutTab = () => {
                             ✕
                         </button>
                         <h4 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
-                            <span>⚡ Chốt Kỳ Đối Soát Mới</span>
+                            <span>Chốt Kỳ Đối Soát Mới</span>
                         </h4>
                         <p className="text-xs text-slate-500 mb-5">
                             Gom toàn bộ các đơn hàng VietQR đã hoàn tất để chuẩn bị giải ngân cho các tiệm giặt.
@@ -473,7 +477,7 @@ const AdminPayoutTab = () => {
                             </div>
 
                             <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs text-amber-800 space-y-1">
-                                <p className="font-bold">💡 Lưu ý đối soát:</p>
+                                <p className="font-bold">Lưu ý đối soát:</p>
                                 <p>• Hệ thống chỉ gom đơn đã hoàn thành (`COMPLETED`) và không có khiếu nại đang mở.</p>
                                 <p>• Tiệm không có đơn hợp lệ trong kỳ sẽ được bỏ qua tự động.</p>
                             </div>
@@ -513,7 +517,7 @@ const AdminPayoutTab = () => {
                         </button>
 
                         <h4 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
-                            <span>🏦 Giải Ngân Cho Tiệm: {selectedPayout.shopName}</span>
+                            <span>Giải Ngân Cho Tiệm: {selectedPayout.shopName}</span>
                         </h4>
                         <p className="text-xs text-slate-500 mb-4">
                             Đợt đối soát #{selectedPayout.id} ({selectedPayout.periodStart} → {selectedPayout.periodEnd})
@@ -552,7 +556,7 @@ const AdminPayoutTab = () => {
                         {selectedPayout.bankAccountNumber ? (
                             <div className="border border-indigo-100 bg-indigo-50/40 rounded-2xl p-4 flex flex-col items-center mb-4">
                                 <span className="text-xs font-bold text-indigo-900 mb-2">
-                                    📱 Mở App ngân hàng quét mã QR để chuyển tiền nhanh:
+                                    Mở ứng dụng ngân hàng quét mã QR để chuyển tiền:
                                 </span>
                                 <div className="p-2 bg-white rounded-xl shadow-sm border border-indigo-100">
                                     <img
@@ -569,7 +573,7 @@ const AdminPayoutTab = () => {
                             </div>
                         ) : (
                             <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-700 mb-4">
-                                ⚠️ Chủ tiệm chưa cấu hình số tài khoản ngân hàng. Vui lòng liên hệ chủ tiệm cập nhật trước khi chuyển khoản.
+                                Chủ tiệm chưa cấu hình số tài khoản ngân hàng. Vui lòng liên hệ chủ tiệm cập nhật trước khi chuyển khoản.
                             </div>
                         )}
 

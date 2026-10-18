@@ -284,7 +284,7 @@ const DisputeModal = ({ isOpen, onClose, order, onSuccess }) => {
                                     <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-300 rounded-2xl p-4 shadow-sm space-y-3">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-xl">🎁</span>
+                                                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                                                 <div>
                                                     <h4 className="text-xs font-black text-amber-900 uppercase tracking-wider">
                                                         Đã Bồi Thường Bằng Voucher Giảm Giá
@@ -318,7 +318,7 @@ const DisputeModal = ({ isOpen, onClose, order, onSuccess }) => {
                                     <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-300 rounded-2xl p-4 shadow-sm space-y-3">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-xl">🏦</span>
+                                                <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
                                                 <div>
                                                     <h4 className="text-xs font-black text-emerald-900 uppercase tracking-wider">
                                                         Đã Chuyển Khoản Bồi Thường Trực Tiếp
@@ -485,7 +485,7 @@ const DisputeModal = ({ isOpen, onClose, order, onSuccess }) => {
                         /* CREATE NEW DISPUTE FORM */
                         <form id="dispute-create-form" onSubmit={handleSubmitCreate} className="space-y-4">
                             <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/70 text-xs text-amber-800 leading-relaxed">
-                                💡 <strong>Chính sách bảo vệ khách hàng:</strong> Quý khách vui lòng cung cấp lý do cụ thể kèm ảnh chụp rõ nét tình trạng quần áo/đồ dùng. Shop sẽ xem xét và lựa chọn phương án hoàn tiền qua VietQR hoặc tặng Voucher đền bù.
+                                <strong>Chính sách bảo vệ khách hàng:</strong> Quý khách vui lòng cung cấp lý do cụ thể kèm ảnh chụp rõ nét tình trạng quần áo/đồ dùng. Shop sẽ xem xét và lựa chọn phương án hoàn tiền qua VietQR hoặc tặng Voucher đền bù.
                             </div>
 
                             {/* Reason Selector */}
@@ -548,7 +548,7 @@ const DisputeModal = ({ isOpen, onClose, order, onSuccess }) => {
                             {/* Bank Details for VietQR Refund */}
                             <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                                 <div className="flex items-center gap-1.5">
-                                    <span className="text-sm">🏦</span>
+                                    <span className="text-xs font-bold text-slate-700">TK</span>
                                     <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
                                         Tài khoản nhận tiền (Nếu chọn nhận chuyển khoản VietQR)
                                     </span>

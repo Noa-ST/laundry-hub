@@ -303,11 +303,11 @@ const OwnerDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                         <span className="text-slate-500">Hình thức đền bù:</span>{' '}
                                         {dispute.refundMethod === 'VOUCHER' ? (
                                             <span className="inline-flex items-center gap-1 font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded text-[11px]">
-                                                🎟️ Voucher giảm giá: <code className="font-mono">{dispute.compensationVoucherCode}</code>
+                                                Voucher giảm giá: <code className="font-mono">{dispute.compensationVoucherCode}</code>
                                             </span>
                                         ) : (
                                             <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[11px]">
-                                                🏦 Chuyển khoản VietQR
+                                                Chuyển khoản VietQR
                                             </span>
                                         )}
                                     </p>
@@ -449,7 +449,7 @@ const OwnerDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                                 }`}
                                             >
                                                 <div className="flex items-center space-x-2">
-                                                    <span className="text-lg">🏦</span>
+                                                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">VietQR</span>
                                                     <div>
                                                         <h5 className="text-xs font-bold text-slate-900">Phương án 1: Chuyển khoản VietQR</h5>
                                                         <p className="text-[10px] text-slate-500 mt-0.5">Quét QR chuyển ngay theo STK khách</p>
@@ -466,7 +466,7 @@ const OwnerDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                                 }`}
                                             >
                                                 <div className="flex items-center space-x-2">
-                                                    <span className="text-lg">🎟️</span>
+                                                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700">Voucher</span>
                                                     <div>
                                                         <h5 className="text-xs font-bold text-slate-900">Phương án 2: Bồi hoàn Voucher của tiệm</h5>
                                                         <p className="text-[10px] text-slate-500 mt-0.5">Cấp mã giảm giá khấu trừ doanh thu đơn sau</p>
@@ -543,7 +543,7 @@ const OwnerDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                                 </div>
                                             ) : (
                                                 <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-800">
-                                                    ⚠️ Khách hàng chưa cung cấp STK trong đơn khiếu nại. Bạn có thể chọn <strong>Phương án 2 (Bồi hoàn bằng Voucher)</strong> hoặc nhắn khách gửi STK qua khung chat.
+                                                    Khách hàng chưa cung cấp STK trong đơn khiếu nại. Bạn có thể chọn <strong>Phương án 2 (Bồi hoàn bằng Voucher)</strong> hoặc nhắn khách gửi STK qua khung chat.
                                                 </div>
                                             )}
 
@@ -594,7 +594,7 @@ const OwnerDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                     {refundMethod === 'VOUCHER' && (
                                         <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-300/80 space-y-2.5 animate-fade-in">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-xl">🎁</span>
+                                                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                                                 <h5 className="text-xs font-black text-amber-900 uppercase">
                                                     Tiệm phát hành Voucher đền bù cho khách
                                                 </h5>
@@ -603,7 +603,7 @@ const OwnerDisputeModal = ({ isOpen, onClose, dispute, onSuccess }) => {
                                                 Tiệm của bạn sẽ cấp một mã Voucher trị giá <strong className="text-rose-600 font-bold">{acceptedAmount ? Number(acceptedAmount).toLocaleString('vi-VN') + ' đ' : '0 đ'}</strong> (định dạng <code>REFUND-{dispute.orderId}-XXXX</code>) gửi trực tiếp vào ví ưu đãi của khách hàng.
                                             </p>
                                             <div className="p-2.5 bg-white/80 rounded-lg border border-amber-200 text-[11px] text-amber-900 space-y-1.5">
-                                                <p className="font-semibold text-amber-950">📌 Trách nhiệm chi phí của tiệm:</p>
+                                                <p className="font-semibold text-amber-950">Trách nhiệm chi phí của tiệm:</p>
                                                 <p>• Mã chỉ có giá trị sử dụng tại chính tiệm của bạn trong 90 ngày. Khoản tiền bồi thường này sẽ được <strong>khấu trừ vào doanh thu của tiệm</strong> ở lần giặt tiếp theo của khách.</p>
                                                 <p>• <strong className="text-rose-600">Lưu ý quan trọng:</strong> Chỉ áp dụng hình thức này khi <strong>đã thương lượng và được khách hàng đồng ý</strong>. Nếu khách đòi tiền mặt mà tiệm tự ý đền bằng voucher, khách có thể gửi khiếu nại lên Ban Quản Trị để xử lý phạt vi phạm.</p>
                                             </div>

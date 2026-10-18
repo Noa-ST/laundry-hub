@@ -1,5 +1,6 @@
 package com.laundry.controller;
 
+import com.laundry.dto.request.UpdateOrderItemsRequestDTO;
 import com.laundry.dto.request.UpdateOrderStatusRequestDTO;
 import com.laundry.dto.request.InspectOrderRequestDTO;
 import com.laundry.dto.response.ApiResponse;
@@ -59,6 +60,15 @@ public class OwnerOrderController {
             @Valid @RequestBody InspectOrderRequestDTO request) {
         Long ownerId = SecurityUtils.getCurrentUserId();
         OrderResponseDTO updatedOrder = ownerOrderService.inspectOrder(ownerId, orderId, request);
+        return ResponseEntity.ok(ApiResponse.success(updatedOrder));
+    }
+
+    @PatchMapping("/{orderId}/items")
+    public ResponseEntity<ApiResponse<OrderResponseDTO>> updateOrderItems(
+            @PathVariable Long orderId,
+            @Valid @RequestBody UpdateOrderItemsRequestDTO request) {
+        Long ownerId = SecurityUtils.getCurrentUserId();
+        OrderResponseDTO updatedOrder = ownerOrderService.updateOrderItems(ownerId, orderId, request);
         return ResponseEntity.ok(ApiResponse.success(updatedOrder));
     }
 

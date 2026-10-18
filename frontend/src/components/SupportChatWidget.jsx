@@ -90,7 +90,7 @@ const SupportChatWidget = () => {
                         });
                         if (!isOpen && data.senderRole === 'ADMIN') {
                             setUnreadCount(prev => prev + 1);
-                            toast("💬 Có phản hồi mới từ CSKH LaundryHub!", { icon: '🎧' });
+                            toast("Có phản hồi mới từ CSKH LaundryHub!");
                         }
                     } else if (data.status) {
                         // Conversation status update
@@ -217,7 +217,7 @@ const SupportChatWidget = () => {
                         <div className="flex items-center gap-3">
                             <div className="relative">
                                 <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 text-white font-bold text-lg">
-                                    🎧
+                                    
                                 </div>
                                 <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white"></span>
                             </div>
@@ -250,7 +250,7 @@ const SupportChatWidget = () => {
                                 LH
                             </div>
                             <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-none p-3 shadow-sm text-xs text-slate-700 max-w-[85%] leading-relaxed">
-                                <p className="font-semibold text-teal-800 mb-1">Chào bạn{currentUser?.fullName ? ` ${currentUser.fullName}` : ''}! 👋</p>
+                                <p className="font-semibold text-teal-800 mb-1">Chào bạn{currentUser?.fullName ? ` ${currentUser.fullName}` : ''}!</p>
                                 <p>Đội ngũ Hỗ trợ CSKH LaundryHub có thể giúp gì cho bạn hôm nay? Hãy gửi thắc mắc về đơn hàng, tài khoản, đối soát hay khiếu nại tại đây nhé!</p>
                             </div>
                         </div>
@@ -286,7 +286,7 @@ const SupportChatWidget = () => {
                                             >
                                                 {!isMe && isAdmin && (
                                                     <span className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider mb-0.5">
-                                                        🛡️ CSKH Admin
+                                                        CSKH Admin
                                                     </span>
                                                 )}
                                                 <p className="whitespace-pre-wrap break-words">{msg.content}</p>

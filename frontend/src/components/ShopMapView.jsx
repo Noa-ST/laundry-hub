@@ -95,7 +95,7 @@ const ShopMapView = ({ shops = [], userLocation, location }) => {
 
     const handleBookingSuccess = () => {
         setBookingShop(null);
-        toast.success("🎉 Đặt lịch thành công!");
+        toast.success("Đặt lịch thành công!");
         window.location.hash = 'orders';
     };
 

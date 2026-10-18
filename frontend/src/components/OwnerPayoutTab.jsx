@@ -144,7 +144,7 @@ const OwnerPayoutTab = () => {
                             <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-300">
                                 Tài khoản nhận tiền giải ngân
                             </span>
-                            <span className="text-xl">💳</span>
+                            <span className="text-xs font-bold px-2 py-1 bg-slate-100 text-slate-700 rounded">TKNH</span>
                         </div>
 
                         {isBankConfigured ? (
@@ -169,7 +169,7 @@ const OwnerPayoutTab = () => {
                         ) : (
                             <div className="py-4 text-center">
                                 <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center text-xl mx-auto mb-2">
-                                    ⚠️
+                                    
                                 </div>
                                 <p className="text-xs font-bold text-amber-200 mb-1">Chưa cài đặt tài khoản</p>
                                 <p className="text-[11px] text-slate-300 mb-3">
@@ -243,7 +243,7 @@ const OwnerPayoutTab = () => {
                     {/* Schedule Banner */}
                     <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shrink-0">
-                            📅
+                            
                         </div>
                         <div>
                             <h5 className="text-xs font-bold text-indigo-950">
@@ -338,17 +338,17 @@ const OwnerPayoutTab = () => {
                                         <td className="p-4 text-center">
                                             {p.status === 'PENDING' && (
                                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
-                                                    ⏳ Đang xử lý
+                                                    Đang xử lý
                                                 </span>
                                             )}
                                             {p.status === 'COMPLETED' && (
                                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">
-                                                    ✓ Đã nhận tiền
+                                                    Đã nhận tiền
                                                 </span>
                                             )}
                                             {p.status === 'REJECTED' && (
                                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-100 px-2.5 py-1 rounded-full">
-                                                    ✕ Đã hủy
+                                                    Đã hủy
                                                 </span>
                                             )}
                                         </td>
@@ -391,7 +391,7 @@ const OwnerPayoutTab = () => {
                         </button>
 
                         <h4 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
-                            <span>💳 Cài Đặt Tài Khoản Ngân Hàng</span>
+                            <span>Cài Đặt Tài Khoản Ngân Hàng</span>
                         </h4>
                         <p className="text-xs text-slate-500 mb-5">
                             Thông tin này sẽ được dùng để Admin giải ngân doanh thu định kỳ về tài khoản của bạn.

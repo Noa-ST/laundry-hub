@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axiosClient from '../api/axiosClient';
+import toast from 'react-hot-toast';
 
 const OrderDetailModal = ({ isOpen, onClose, order, formatMoney, renderActions, onUpdateSuccess, onViewDispute }) => {
     const [itemQuantities, setItemQuantities] = useState({});
@@ -7,7 +8,7 @@ const OrderDetailModal = ({ isOpen, onClose, order, formatMoney, renderActions, 
     const saveTimeoutRef = useRef(null);
 
     useEffect(() => {
-        if (order) {
+        if (order && order.items) {
             const initial = {};
             order.items.forEach(i => initial[i.id] = i.quantity);
             setItemQuantities(initial);
@@ -17,6 +18,11 @@ const OrderDetailModal = ({ isOpen, onClose, order, formatMoney, renderActions, 
     if (!isOpen || !order) return null;
 
     const canEditQuantity = ['PENDING', 'CONFIRMED', 'PICKING_UP', 'RECEIVED'].includes(order.status);
+
+    const hasChanges = order?.items?.some(item => {
+        const current = itemQuantities[item.id];
+        return current !== undefined && Math.abs(current - item.quantity) > 0.0001;
+    });
 
     const handleQuantityChange = (itemId, val) => {
         const num = parseFloat(val);
@@ -29,25 +35,33 @@ const OrderDetailModal = ({ isOpen, onClose, order, formatMoney, renderActions, 
         // Auto save on change with debounce
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = setTimeout(async () => {
-            await autoSaveQuantities(newQuantities);
-        }, 500);
+            await saveQuantities(newQuantities, false);
+        }, 1200);
     };
 
-    const autoSaveQuantities = async (quantities) => {
+    const saveQuantities = async (quantitiesToSave = itemQuantities, showToast = true) => {
         setIsSaving(true);
         try {
             const payload = {
-                items: Object.keys(quantities).map(id => ({
+                items: Object.keys(quantitiesToSave).map(id => ({
                     itemId: parseInt(id),
-                    quantity: parseFloat(quantities[id])
+                    quantity: parseFloat(quantitiesToSave[id])
                 }))
             };
             const res = await axiosClient.patch(`/owner/orders/${order.id}/items`, payload);
-            if (res.success && onUpdateSuccess) {
-                onUpdateSuccess();
+            if (res.success) {
+                if (showToast) {
+                    toast.success("Đã cập nhật số lượng và tính lại tổng tiền thành công!");
+                }
+                if (onUpdateSuccess) {
+                    onUpdateSuccess(res.data);
+                }
+            } else {
+                toast.error(res.message || "Không thể cập nhật số lượng");
             }
         } catch (error) {
-            console.error("Auto save failed:", error);
+            console.error("Save quantities failed:", error);
+            toast.error(error.response?.data?.message || "Lỗi khi lưu số lượng đơn hàng");
         } finally {
             setIsSaving(false);
         }
@@ -73,7 +87,9 @@ const OrderDetailModal = ({ isOpen, onClose, order, formatMoney, renderActions, 
         const currentQty = itemQuantities[item.id] !== undefined ? itemQuantities[item.id] : item.quantity;
         return sum + (item.priceAtBooking * currentQty);
     }, 0);
-    const localTotalPrice = localServiceFee + order.shippingFee;
+    const shippingFee = order.shippingFee || 0;
+    const discountAmount = order.discountAmount || 0;
+    const localTotalPrice = Math.max(0, localServiceFee + shippingFee - discountAmount);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
@@ -175,9 +191,43 @@ const OrderDetailModal = ({ isOpen, onClose, order, formatMoney, renderActions, 
 
                     {/* Bảng Chi tiết Dịch vụ */}
                     <div>
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chi Tiết Dịch Vụ</h3>
-                            {isSaving && <span className="text-[10px] text-slate-400 italic">Đang lưu...</span>}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chi Tiết Dịch Vụ</h3>
+                                    {canEditQuantity && (
+                                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            Có thể sửa số lượng / Kg
+                                        </span>
+                                    )}
+                                </div>
+                                {canEditQuantity && (
+                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                        Nhập số kg hoặc số lượng thực tế sau khi nhận đồ để hệ thống tính lại tiền.
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {isSaving && (
+                                    <span className="text-xs text-indigo-600 font-medium flex items-center gap-1.5 animate-pulse">
+                                        <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                                        Đang lưu...
+                                    </span>
+                                )}
+                                {hasChanges && canEditQuantity && (
+                                    <button
+                                        type="button"
+                                        onClick={() => saveQuantities(itemQuantities, true)}
+                                        disabled={isSaving}
+                                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
+                                    >
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Lưu số lượng mới
+                                    </button>
+                                )}
+                            </div>
                         </div>
                         <div className="border border-slate-200 rounded-xl overflow-hidden">
                             <table className="w-full text-left text-xs">
@@ -192,10 +242,18 @@ const OrderDetailModal = ({ isOpen, onClose, order, formatMoney, renderActions, 
                                 <tbody className="divide-y divide-slate-100 bg-white">
                                     {order.items && order.items.map(item => {
                                         const currentQty = itemQuantities[item.id] !== undefined ? itemQuantities[item.id] : item.quantity;
+                                        const isModified = itemQuantities[item.id] !== undefined && Math.abs(itemQuantities[item.id] - item.quantity) > 0.0001;
                                         const lineTotal = item.priceAtBooking * currentQty;
                                         return (
-                                            <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-4 py-3.5 font-medium text-slate-900">{item.serviceName}</td>
+                                            <tr key={item.id} className={`transition-colors ${isModified ? 'bg-indigo-50/30' : 'hover:bg-slate-50/50'}`}>
+                                                <td className="px-4 py-3.5 font-medium text-slate-900">
+                                                    <div>{item.serviceName}</div>
+                                                    {isModified && (
+                                                        <span className="text-[10px] text-indigo-600 font-semibold">
+                                                            (Khách đặt: {item.quantity} {item.unit})
+                                                        </span>
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-3.5 text-right text-slate-600">{formatMoney(item.priceAtBooking)}</td>
                                                 <td className="px-4 py-3.5 text-right">
                                                     {canEditQuantity ? (
@@ -206,9 +264,13 @@ const OrderDetailModal = ({ isOpen, onClose, order, formatMoney, renderActions, 
                                                                 min="0"
                                                                 value={itemQuantities[item.id] === undefined ? '' : itemQuantities[item.id]} 
                                                                 onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                                                                className="w-16 text-right border border-slate-200 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition-shadow bg-slate-50 focus:bg-white"
+                                                                className={`w-20 text-right border rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none transition-all ${
+                                                                    isModified
+                                                                        ? 'border-indigo-400 bg-indigo-50/60 text-indigo-900 ring-1 ring-indigo-300'
+                                                                        : 'border-slate-300 bg-white text-slate-900 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                                                                }`}
                                                             />
-                                                            <span className="text-slate-500 font-medium">{item.unit}</span>
+                                                            <span className="text-slate-500 font-semibold min-w-[24px] text-left">{item.unit}</span>
                                                         </div>
                                                     ) : (
                                                         <span className="font-semibold text-slate-700">{item.quantity} <span className="font-normal text-slate-500">{item.unit}</span></span>
@@ -268,15 +330,39 @@ const OrderDetailModal = ({ isOpen, onClose, order, formatMoney, renderActions, 
                         <div className="flex items-center gap-2 text-slate-600 text-xs font-medium">
                             <span>Tiền dịch vụ: {formatMoney(localServiceFee)}</span>
                             <span>+</span>
-                            <span>Phí giao nhận: {formatMoney(order.shippingFee)}</span>
+                            <span>Phí giao nhận: {formatMoney(shippingFee)}</span>
+                            {discountAmount > 0 && (
+                                <>
+                                    <span>-</span>
+                                    <span className="text-rose-600 font-semibold">Giảm giá: {formatMoney(discountAmount)}</span>
+                                </>
+                            )}
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="font-semibold text-slate-900 text-sm">Tổng cộng:</span>
                             <span className="text-lg font-black text-slate-900 tracking-tight">{formatMoney(localTotalPrice)}</span>
+                            {hasChanges && (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                                    Tạm tính
+                                </span>
+                            )}
                         </div>
                     </div>
                     
                     <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                        {hasChanges && canEditQuantity && (
+                            <button
+                                type="button"
+                                onClick={() => saveQuantities(itemQuantities, true)}
+                                disabled={isSaving}
+                                className="h-10 px-4 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 whitespace-nowrap"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                                {isSaving ? 'Đang lưu...' : 'Lưu số lượng'}
+                            </button>
+                        )}
                         <button 
                             type="button"
                             onClick={onClose} 

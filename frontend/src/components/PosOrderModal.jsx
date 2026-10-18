@@ -485,7 +485,7 @@ const PosOrderModal = ({ isOpen, onClose, onSuccess }) => {
                                     </p>
                                 </div>
                                 <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${isPaid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                                    {isPaid ? '✓ Đã thu tiền' : '⏳ Thu khi lấy đồ'}
+                                    {isPaid ? 'Đã thu tiền' : 'Thu khi lấy đồ'}
                                 </span>
                             </div>
                         </div>
