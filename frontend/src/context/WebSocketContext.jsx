@@ -24,8 +24,18 @@ export const WebSocketProvider = ({ children }) => {
 
         const socketUrl = import.meta.env.VITE_WS_URL || (import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace(/\/api\/v1\/?$/, '/ws') : '/ws');
         
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            setConnected(false);
+            setStompClient(null);
+            return;
+        }
+
         const client = new Client({
             webSocketFactory: () => new SockJS(socketUrl),
+            connectHeaders: {
+                Authorization: `Bearer ${token}`,
+            },
             reconnectDelay: 5000,
             heartbeatIncoming: 4000,
             heartbeatOutgoing: 4000,
@@ -34,13 +44,12 @@ export const WebSocketProvider = ({ children }) => {
         client.onConnect = () => {
             setConnected(true);
 
-            // Subscribe to customer notifications
+            // Subscribe to personal notifications (both customer and shop owner)
             client.subscribe(`/topic/user/${currentUser.userId}/notifications`, (message) => {
                 if (message.body) {
                     try {
                         const payload = JSON.parse(message.body);
 
-                        
                         // Play sound
                         try {
                             const audio = new Audio('/bell.mp3');
@@ -57,21 +66,6 @@ export const WebSocketProvider = ({ children }) => {
                     }
                 }
             });
-            
-            // If owner, subscribe to global owner notifications
-            if (currentUser.role === 'SHOP_OWNER') {
-                client.subscribe('/topic/owner/notifications', (message) => {
-                    if (message.body) {
-                        try {
-                            const payload = JSON.parse(message.body);
-                            setNotification(payload);
-                            setTimeout(() => setNotification(null), 5000);
-                        } catch (e) {
-                            console.error("Lỗi đọc payload owner notification:", e);
-                        }
-                    }
-                });
-            }
         };
 
         client.onStompError = (frame) => {

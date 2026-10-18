@@ -14,6 +14,8 @@ import java.util.Optional;
 public interface SupportConversationRepository extends JpaRepository<SupportConversation, Long> {
     Optional<SupportConversation> findByUserId(Long userId);
 
+    boolean existsByIdAndUserId(Long id, Long userId);
+
     Page<SupportConversation> findAllByOrderByLastMessageAtDesc(Pageable pageable);
 
     Page<SupportConversation> findByStatusOrderByLastMessageAtDesc(SupportStatus status, Pageable pageable);

@@ -11,10 +11,6 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.time.LocalDateTime;
 
 @Service
 public class CloudinaryService {
@@ -58,31 +54,20 @@ public class CloudinaryService {
     /**
      * Deletes an image from Cloudinary asynchronously.
      */
-    private void appendLog(String message) {
-        try {
-            String logMsg = LocalDateTime.now() + " - " + message + "\n";
-            Files.write(Paths.get("cloudinary-log.txt"), logMsg.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            logger.info(message);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
     @Async
     public void deleteImageAsync(String url) {
         String publicId = extractPublicId(url);
-        appendLog("URL to delete: " + url + " -> Extracted publicId: " + publicId);
+        logger.info("URL to delete: {} -> Extracted publicId: {}", url, publicId);
         if (publicId != null) {
             try {
-                appendLog("Attempting to delete Cloudinary image: " + publicId);
+                logger.info("Attempting to delete Cloudinary image: {}", publicId);
                 Map result = cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
-                appendLog("Cloudinary delete result for " + publicId + ": " + result.get("result"));
+                logger.info("Cloudinary delete result for {}: {}", publicId, result.get("result"));
             } catch (Exception e) {
-                appendLog("Failed to delete Cloudinary image: " + publicId + " - Error: " + e.getMessage());
-                logger.error("Failed to delete Cloudinary image: {}", publicId, e);
+                logger.error("Failed to delete Cloudinary image: {} - Error: {}", publicId, e.getMessage(), e);
             }
         } else {
-            appendLog("Could not extract publicId for url: " + url);
+            logger.warn("Could not extract publicId for url: {}", url);
         }
     }
 }

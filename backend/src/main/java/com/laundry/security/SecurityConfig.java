@@ -38,7 +38,9 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitingFilter rateLimitingFilter;
 
-    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://laundry-hub-six.vercel.app,https://*.vercel.app,https://laundryhub.vercel.app}")
+    // Danh sách origin chính xác (KHÔNG dùng wildcard như https://*.vercel.app vì ai cũng deploy được lên vercel.app).
+    // Override trên server bằng biến môi trường APP_CORS_ALLOWED_ORIGINS.
+    @Value("${app.cors.allowed-origins:" + CorsDefaults.ALLOWED_ORIGINS + "}")
     private List<String> allowedOrigins;
 
     @Bean
@@ -88,7 +90,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/shops/*/reviews").hasRole("CUSTOMER")
                         .requestMatchers("/api/v1/shops/**").permitAll()
                         .requestMatchers("/api/v1/health").permitAll()
-                        .requestMatchers("/api/v1/mock-users").permitAll()
                         .requestMatchers("/api/v1/payments/payos-webhook").permitAll()
                         .requestMatchers("/api/v1/vouchers/validate").permitAll()
                         .requestMatchers("/api/v1/vouchers/shop/**").permitAll()
@@ -115,9 +116,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(allowedOrigins);
+        // setAllowedOrigins (so khớp chính xác) thay vì setAllowedOriginPatterns để không thể vô tình cho phép wildcard.
+        configuration.setAllowedOrigins(CorsDefaults.sanitize(allowedOrigins));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With"));
         configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);

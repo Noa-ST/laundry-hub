@@ -26,6 +26,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     java.util.Optional<Order> findByPayosOrderCode(Long payosOrderCode);
 
+    // Kiểm tra user có phải khách hàng hoặc chủ tiệm của đơn (dùng cho phân quyền subscribe WebSocket chat).
+    // LEFT JOIN customer vì đơn POS có thể không gắn tài khoản khách.
+    @Query("SELECT COUNT(o) > 0 FROM Order o LEFT JOIN o.customer c JOIN o.shop s " +
+           "WHERE o.id = :orderId AND (c.id = :userId OR s.owner.id = :userId)")
+    boolean isOrderParticipant(@Param("orderId") Long orderId, @Param("userId") Long userId);
+
     long countByCustomerIdAndVoucherIdAndStatusNot(Long customerId, Long voucherId, OrderStatus status);
 
     @Query("SELECT o FROM Order o WHERE o.shop.owner.id = :ownerId AND o.createdAt >= :startDate AND o.createdAt <= :endDate ORDER BY o.createdAt ASC")

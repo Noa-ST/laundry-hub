@@ -17,7 +17,9 @@ import java.util.UUID;
 @Slf4j
 public class JwtUtils {
 
-    @Value("${app.jwtSecret:2b44b0bce6123456789012345678901234567890123456789012345678901234}")
+    // Bắt buộc cấu hình qua biến môi trường APP_JWTSECRET (chuỗi Base64, tối thiểu 32 byte).
+    // KHÔNG đặt giá trị mặc định: thiếu secret thì ứng dụng phải dừng khởi động thay vì ký token bằng key công khai.
+    @Value("${app.jwtSecret}")
     private String jwtSecret;
 
     @Value("${app.jwtExpirationMs:1800000}") // 30 minutes
@@ -63,6 +65,8 @@ public class JwtUtils {
             log.error("JWT token is unsupported: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
             log.error("JWT claims string is empty: {}", e.getMessage());
+        } catch (JwtException e) {
+            log.error("Invalid JWT: {}", e.getMessage());
         }
 
         return false;
