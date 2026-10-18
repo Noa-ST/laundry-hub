@@ -75,7 +75,7 @@ public class SecurityConfig {
                                 .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
                         )
                         .contentSecurityPolicy(csp -> csp
-                                .policyDirectives("default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
+                                .policyDirectives("default-src 'self'; script-src 'self'; img-src 'self' data: blob: https://res.cloudinary.com https://*.openstreetmap.org https://*.mapbox.com; connect-src 'self' https://res.cloudinary.com https://api.mapbox.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
                         )
                 )
                 .exceptionHandling(exception -> exception

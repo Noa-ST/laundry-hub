@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { handleGeolocationError, GEOLOCATION_OPTIONS } from '../utils/geoUtils';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -57,10 +58,11 @@ const LocationPickerMap = ({
                     notifyChange(searchQuery, lat, lng);
                     reverseGeocode(lat, lng);
                 },
-                () => {
+                (err) => {
                     // Người dùng từ chối quyền -> giữ DEFAULT_CENTER
+                    console.warn("Auto GPS error:", err);
                 },
-                { enableHighAccuracy: true, timeout: 6000 }
+                GEOLOCATION_OPTIONS
             );
         }
     }, []);
@@ -237,9 +239,9 @@ const LocationPickerMap = ({
             },
             (err) => {
                 setLocating(false);
-                console.warn("GPS error:", err);
+                handleGeolocationError(err);
             },
-            { enableHighAccuracy: true, timeout: 8000 }
+            GEOLOCATION_OPTIONS
         );
     };
 

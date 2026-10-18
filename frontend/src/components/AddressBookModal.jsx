@@ -4,6 +4,7 @@ import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import LocationPickerMap from './LocationPickerMap';
 import toast from 'react-hot-toast';
+import { handleGeolocationError, GEOLOCATION_OPTIONS } from '../utils/geoUtils';
 
 const AddressBookModal = ({ isOpen, onClose, onSelectAddress }) => {
     const { currentUser } = useAuth();
@@ -45,10 +46,13 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }) => {
                     setLat(pos.coords.latitude.toFixed(6));
                     setLng(pos.coords.longitude.toFixed(6));
                 },
-                (err) => toast.error("Lỗi lấy vị trí: " + err.message)
+                (err) => {
+                    handleGeolocationError(err);
+                },
+                GEOLOCATION_OPTIONS
             );
         } else {
-            toast("Trình duyệt không hỗ trợ Geolocation");
+            alert("Trình duyệt của bạn không hỗ trợ định vị GPS.");
         }
     };
 

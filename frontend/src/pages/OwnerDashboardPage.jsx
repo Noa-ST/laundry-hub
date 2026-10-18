@@ -15,6 +15,7 @@ import OwnerPayoutTab from '../components/OwnerPayoutTab';
 import LocationPickerMap from '../components/LocationPickerMap';
 import { useWebSocket } from '../context/WebSocketContext';
 import toast from 'react-hot-toast';
+import { handleGeolocationError, GEOLOCATION_OPTIONS } from '../utils/geoUtils';
 
 const OwnerDashboardPage = () => {
     const [shopData, setShopData] = useState(null);
@@ -209,10 +210,13 @@ const OwnerDashboardPage = () => {
                         longitude: parseFloat(position.coords.longitude.toFixed(6))
                     }));
                 },
-                (error) => toast.error("Không thể lấy vị trí: " + error.message)
+                (error) => {
+                    handleGeolocationError(error);
+                },
+                GEOLOCATION_OPTIONS
             );
         } else {
-            toast("Trình duyệt của bạn không hỗ trợ Geolocation.");
+            alert("Trình duyệt của bạn không hỗ trợ định vị GPS.");
         }
     };
 
