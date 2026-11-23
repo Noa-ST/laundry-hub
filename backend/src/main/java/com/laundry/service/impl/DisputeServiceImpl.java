@@ -10,7 +10,10 @@ import com.laundry.entity.Role;
 import com.laundry.entity.Shop;
 import com.laundry.entity.User;
 import com.laundry.enums.DisputeStatus;
+import com.laundry.enums.OrderPayoutStatus;
 import com.laundry.enums.OrderStatus;
+import com.laundry.exception.BadRequestException;
+import com.laundry.exception.ResourceNotFoundException;
 import com.laundry.repository.DisputeRepository;
 import com.laundry.repository.OrderRepository;
 import com.laundry.repository.ShopRepository;
@@ -23,6 +26,7 @@ import com.laundry.enums.RefundMethod;
 import com.laundry.repository.VoucherRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +47,7 @@ public class DisputeServiceImpl implements DisputeService {
     private User getUserByPrincipal(String username) {
         return userRepository.findByPhone(username)
                 .or(() -> userRepository.findByEmail(username))
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
     }
 
     @Override
@@ -52,18 +56,29 @@ public class DisputeServiceImpl implements DisputeService {
         User customer = getUserByPrincipal(username);
                 
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng"));
                 
         if (order.getCustomer() == null || !order.getCustomer().getId().equals(customer.getId())) {
-            throw new RuntimeException("Order does not belong to you");
+            throw new AccessDeniedException("Đơn hàng này không thuộc về bạn");
         }
         
         if (order.getStatus() != OrderStatus.COMPLETED) {
-            throw new RuntimeException("Only COMPLETED orders can have disputes");
+            throw new BadRequestException("Chỉ có thể gửi khiếu nại cho đơn hàng đã hoàn thành (COMPLETED)");
+        }
+
+        if (order.getPayoutStatus() == OrderPayoutStatus.SETTLED) {
+            throw new BadRequestException("Đơn hàng đã hoàn tất đối soát, không thể mở khiếu nại mới. Vui lòng liên hệ CSKH.");
         }
         
-        if (order.isHasDispute()) {
-            throw new RuntimeException("Dispute already exists for this order");
+        if (order.isHasDispute() || disputeRepository.findByOrderId(orderId).isPresent()) {
+            throw new BadRequestException("Đơn hàng này đã có khiếu nại trước đó");
+        }
+
+        if (request.getRequestedAmount() == null || request.getRequestedAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Số tiền yêu cầu bồi thường phải lớn hơn 0");
+        }
+        if (order.getFinalTotalPrice() != null && request.getRequestedAmount().compareTo(order.getFinalTotalPrice()) > 0) {
+            throw new BadRequestException("Số tiền yêu cầu bồi thường không được vượt quá giá trị đơn hàng");
         }
         
         Dispute dispute = Dispute.builder()
@@ -209,6 +224,10 @@ public class DisputeServiceImpl implements DisputeService {
             } else {
                 dispute.setRefundProofUrl(request.getRefundProofUrl());
             }
+            // Tiệm đã trực tiếp bồi thường bằng chuyển khoản/voucher -> mở khóa payout cho đơn
+            Order order = dispute.getOrder();
+            order.setHasDispute(false);
+            orderRepository.save(order);
         } else {
             dispute.setStatus(DisputeStatus.REJECTED);
         }
@@ -274,7 +293,13 @@ public class DisputeServiceImpl implements DisputeService {
     @Transactional
     public DisputeResponse adminResolve(Long disputeId, AdminResolveDisputeRequest request) {
         Dispute dispute = disputeRepository.findById(disputeId)
-                .orElseThrow(() -> new RuntimeException("Dispute not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khiếu nại"));
+
+        if (dispute.getStatus() == DisputeStatus.RESOLVED_REFUNDED
+                || dispute.getStatus() == DisputeStatus.ADMIN_REJECTED
+                || dispute.getStatus() == DisputeStatus.CANCELLED) {
+            throw new BadRequestException("Khiếu nại này đã được giải quyết hoặc đã đóng, không thể phân xử lại.");
+        }
                 
         boolean accepted = Boolean.TRUE.equals(request.getAcceptRefund());
         if (accepted) {
@@ -305,8 +330,13 @@ public class DisputeServiceImpl implements DisputeService {
                 dispute.setRefundProofUrl(request.getRefundProofUrl());
             }
         } else {
-            dispute.setStatus(DisputeStatus.REJECTED);
+            dispute.setStatus(DisputeStatus.ADMIN_REJECTED);
         }
+
+        // Sau khi Admin phán quyết xong, mở khóa hasDispute để không treo payout vĩnh viễn
+        Order order = dispute.getOrder();
+        order.setHasDispute(false);
+        orderRepository.save(order);
         
         dispute.setAdminDecisionNote(request.getAdminDecisionNote());
         dispute = disputeRepository.save(dispute);
@@ -348,10 +378,10 @@ public class DisputeServiceImpl implements DisputeService {
         }
                 
         if (dispute.getStatus() != DisputeStatus.OPEN) {
-            throw new RuntimeException("Only OPEN disputes can be cancelled");
+            throw new BadRequestException("Chỉ có thể rút lại khiếu nại khi đang ở trạng thái OPEN");
         }
         
-        dispute.setStatus(DisputeStatus.REJECTED);
+        dispute.setStatus(DisputeStatus.CANCELLED);
         Order order = dispute.getOrder();
         order.setHasDispute(false);
         orderRepository.save(order);

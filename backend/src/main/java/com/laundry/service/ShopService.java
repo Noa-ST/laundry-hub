@@ -10,4 +10,5 @@ public interface ShopService {
     ShopResponseDTO getMyShop(Long ownerId);
     ShopResponseDTO setupShop(Long ownerId, SetupShopRequestDTO request);
     ShopResponseDTO updateShop(Long ownerId, com.laundry.dto.request.UpdateShopRequestDTO request);
+    ShopResponseDTO resubmitShop(Long ownerId);
 }

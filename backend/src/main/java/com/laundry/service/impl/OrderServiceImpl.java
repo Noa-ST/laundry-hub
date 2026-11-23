@@ -39,19 +39,24 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderResponseDTO createOrder(Long customerId, CreateOrderRequestDTO request) {
         if (request.items() == null || request.items().isEmpty()) {
-            throw new IllegalArgumentException("ÄÆ¡n hÃ ng pháº£i cÃ³ Ã­t nháº¥t má»™t dá»‹ch vá»¥.");
+            throw new IllegalArgumentException("Đơn hàng phải có ít nhất một dịch vụ.");
         }
-        
-        double totalQty = request.items().stream().mapToDouble(i -> i.quantity()).sum();
-        if (totalQty <= 0) {
-            throw new IllegalArgumentException("ÄÆ¡n hÃ ng pháº£i cÃ³ Ã­t nháº¥t má»™t dá»‹ch vá»¥.");
+
+        for (var itemReq : request.items()) {
+            if (itemReq.quantity() == null || itemReq.quantity() <= 0) {
+                throw new IllegalArgumentException("Số lượng của từng dịch vụ phải lớn hơn 0.");
+            }
         }
 
         User customer = userRepository.findById(customerId)
-                .orElseThrow(() -> new IllegalArgumentException("KhÃ¡ch hÃ ng khÃ´ng tá»“n táº¡i"));
+                .orElseThrow(() -> new IllegalArgumentException("Khách hàng không tồn tại"));
         
         Shop shop = shopRepository.findById(request.shopId())
-                .orElseThrow(() -> new IllegalArgumentException("Tiá»‡m giáº·t khÃ´ng tá»“n táº¡i"));
+                .orElseThrow(() -> new IllegalArgumentException("Tiệm giặt không tồn tại"));
+
+        if (!Boolean.TRUE.equals(shop.getIsActive()) || shop.getApprovalStatus() != com.laundry.enums.ShopApprovalStatus.APPROVED) {
+            throw new IllegalArgumentException("Tiệm giặt hiện không hoạt động hoặc chưa được phê duyệt.");
+        }
 
         Order order = Order.builder()
                 .customer(customer)
@@ -73,15 +78,24 @@ public class OrderServiceImpl implements OrderService {
 
         for (var itemReq : request.items()) {
             LaundryService service = laundryServiceRepository.findById(itemReq.serviceId())
-                    .orElseThrow(() -> new IllegalArgumentException("Dá»‹ch vá»¥ khÃ´ng tá»“n táº¡i: " + itemReq.serviceId()));
+                    .orElseThrow(() -> new IllegalArgumentException("Dịch vụ không tồn tại: " + itemReq.serviceId()));
             
             if (!service.getShop().getId().equals(shop.getId())) {
-                throw new IllegalArgumentException("Dá»‹ch vá»¥ khÃ´ng thuá»™c vá» tiá»‡m nÃ y");
+                throw new IllegalArgumentException("Dịch vụ không thuộc về tiệm này.");
+            }
+            if (!Boolean.TRUE.equals(service.getIsActive())) {
+                throw new IllegalArgumentException("Dịch vụ '" + service.getName() + "' hiện đã ngừng cung cấp.");
             }
 
-            BigDecimal itemPrice = BigDecimal.valueOf(service.getPrice());
+            BigDecimal itemPrice = service.getPrice() != null ? BigDecimal.valueOf(service.getPrice()) : BigDecimal.ZERO;
             BigDecimal quantity = BigDecimal.valueOf(itemReq.quantity());
             BigDecimal lineTotal = itemPrice.multiply(quantity);
+            if (service.getPriceType() != PriceType.CONTACT && service.getMinCharge() != null && service.getMinCharge() > 0) {
+                BigDecimal minCharge = BigDecimal.valueOf(service.getMinCharge());
+                if (lineTotal.compareTo(minCharge) < 0) {
+                    lineTotal = minCharge;
+                }
+            }
             serviceFee = serviceFee.add(lineTotal);
 
             OrderItem orderItem = OrderItem.builder()
@@ -93,7 +107,7 @@ public class OrderServiceImpl implements OrderService {
             order.addItem(orderItem);
         }
 
-        // Logic PhÃ­ Ship
+        // Logic Phí Ship
         BigDecimal shippingFee = BigDecimal.ZERO;
         int shippingLegs = 0;
         if (request.inboundType() == InboundType.SHOP_PICK_UP) shippingLegs++;
@@ -101,7 +115,7 @@ public class OrderServiceImpl implements OrderService {
         
         if (shippingLegs > 0) {
             if (request.userLat() == null || request.userLng() == null) {
-                throw new IllegalArgumentException("KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c vá»‹ trÃ­ giao nháº­n.");
+                throw new IllegalArgumentException("Không xác định được vị trí giao nhận.");
             }
 
             double maxDeliveryDist = shop.getMaxDeliveryDistance() != null ? shop.getMaxDeliveryDistance() : 10.0;
@@ -206,16 +220,24 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
         
-        if (!order.getCustomer().getId().equals(customerId)) {
+        if (order.getCustomer() == null || !order.getCustomer().getId().equals(customerId)) {
             throw new IllegalArgumentException("Bạn không có quyền cập nhật đơn hàng này");
         }
         
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.COMPLETED) {
+            throw new IllegalArgumentException("Không thể đổi phương thức thanh toán cho đơn hàng đã đóng");
+        }
+
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
             throw new IllegalArgumentException("Đơn hàng đã thanh toán, không thể đổi phương thức");
         }
+
+        if (method == null || method.isBlank()) {
+            throw new IllegalArgumentException("Phương thức thanh toán không hợp lệ");
+        }
         
         try {
-            order.setPaymentMethod(PaymentMethod.valueOf(method.toUpperCase()));
+            order.setPaymentMethod(PaymentMethod.valueOf(method.trim().toUpperCase()));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Phương thức thanh toán không hợp lệ");
         }

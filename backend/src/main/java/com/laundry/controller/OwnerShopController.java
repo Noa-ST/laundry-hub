@@ -48,4 +48,12 @@ public class OwnerShopController {
         ShopResponseDTO shop = shopService.updateShop(currentUserId, request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin tiệm thành công", shop));
     }
+
+    @PostMapping("/my-shop/resubmit")
+    @PreAuthorize("hasRole('SHOP_OWNER')")
+    public ResponseEntity<ApiResponse<ShopResponseDTO>> resubmitShop() {
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        ShopResponseDTO shop = shopService.resubmitShop(currentUserId);
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi lại yêu cầu xét duyệt tiệm", shop));
+    }
 }

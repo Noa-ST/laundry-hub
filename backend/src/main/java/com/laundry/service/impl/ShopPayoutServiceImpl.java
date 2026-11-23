@@ -64,7 +64,7 @@ public class ShopPayoutServiceImpl implements ShopPayoutService {
 
     @Override
     @Transactional
-    public List<ShopPayoutResponseDTO> createPayoutBatch(CreatePayoutBatchRequest request) {
+    public synchronized List<ShopPayoutResponseDTO> createPayoutBatch(CreatePayoutBatchRequest request) {
         LocalDate periodEnd = request != null && request.getPeriodEnd() != null 
                 ? request.getPeriodEnd() 
                 : LocalDate.now();
@@ -73,6 +73,9 @@ public class ShopPayoutServiceImpl implements ShopPayoutService {
         double feeRate = (request != null && request.getPlatformFeeRate() != null) 
                 ? request.getPlatformFeeRate() 
                 : 5.0; // Mặc định 5% hoa hồng sàn
+        if (feeRate < 0.0 || feeRate > 100.0) {
+            throw new BadRequestException("Tỷ lệ phí sàn phải nằm trong khoảng 0% đến 100%.");
+        }
 
         List<Shop> targetShops;
         if (request != null && request.getSpecificShopId() != null) {
@@ -167,6 +170,19 @@ public class ShopPayoutServiceImpl implements ShopPayoutService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<OrderResponseDTO> getOrdersInPayoutForOwner(Long ownerId, Long payoutId) {
+        ShopPayout payout = shopPayoutRepository.findById(payoutId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đợt giải ngân #" + payoutId));
+        if (payout.getShop() == null || payout.getShop().getOwner() == null
+                || !payout.getShop().getOwner().getId().equals(ownerId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền xem đơn hàng của đợt giải ngân này.");
+        }
+        List<Order> orders = orderRepository.findByPayoutIdOrderByCreatedAtAsc(payoutId);
+        return orders.stream().map(this::mapToOrderDTO).collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public ShopPayoutResponseDTO confirmPayout(Long payoutId, ConfirmPayoutRequest request) {
         ShopPayout payout = shopPayoutRepository.findById(payoutId)
@@ -174,6 +190,9 @@ public class ShopPayoutServiceImpl implements ShopPayoutService {
 
         if (payout.getStatus() == PayoutStatus.COMPLETED) {
             throw new BadRequestException("Đợt giải ngân này đã hoàn thành trước đó.");
+        }
+        if (payout.getStatus() == PayoutStatus.REJECTED) {
+            throw new BadRequestException("Không thể xác nhận đợt giải ngân đã bị hủy/từ chối.");
         }
 
         payout.setStatus(PayoutStatus.COMPLETED);

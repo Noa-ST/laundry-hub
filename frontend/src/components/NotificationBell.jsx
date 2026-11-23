@@ -48,11 +48,16 @@ const NotificationBell = () => {
         fetchNotifications();
     }, []);
 
-    // Lắng nghe thông báo mới từ WebSocket
+    // Lắng nghe thông báo mới từ WebSocket (chống trùng theo id)
     useEffect(() => {
         if (newNotif) {
-            setNotifications(prev => [newNotif, ...prev]);
-            setUnreadCount(prev => prev + 1);
+            setNotifications(prev => {
+                if (newNotif.id && prev.some(n => n.id === newNotif.id)) {
+                    return prev;
+                }
+                setUnreadCount(c => c + 1);
+                return [newNotif, ...prev];
+            });
         }
     }, [newNotif]);
 
@@ -134,6 +139,11 @@ const NotificationBell = () => {
                                     return (
                                         <div 
                                             key={notif.id || Math.random()} 
+                                            onClick={(e) => {
+                                                if (!notif.read && notif.id) {
+                                                    handleMarkAsRead(notif.id, e);
+                                                }
+                                            }}
                                             className={`p-3.5 hover:bg-slate-50 transition-colors cursor-pointer flex items-start gap-3 ${!notif.read ? 'bg-indigo-50/30' : ''}`}
                                         >
                                             <NotificationIcon icon={meta.icon} tone={meta.tone} size="md" />

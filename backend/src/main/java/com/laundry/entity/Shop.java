@@ -66,6 +66,21 @@ public class Shop {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "approval_status", length = 30)
+    @Builder.Default
+    private com.laundry.enums.ShopApprovalStatus approvalStatus = com.laundry.enums.ShopApprovalStatus.PENDING_APPROVAL;
+
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    public com.laundry.enums.ShopApprovalStatus getApprovalStatus() {
+        return approvalStatus != null ? approvalStatus : com.laundry.enums.ShopApprovalStatus.APPROVED;
+    }
+
     @Column(name = "rating", columnDefinition = "numeric(3,1) default 0.0")
     @Builder.Default
     private Double rating = 0.0;

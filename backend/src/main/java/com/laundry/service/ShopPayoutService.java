@@ -24,6 +24,7 @@ public interface ShopPayoutService {
 
     // --- OWNER METHODS ---
     List<ShopPayoutResponseDTO> getOwnerPayouts(Long ownerId);
+    List<OrderResponseDTO> getOrdersInPayoutForOwner(Long ownerId, Long payoutId);
     OwnerPayoutSummaryDTO getOwnerPayoutSummary(Long ownerId);
     void updateShopBankInfo(Long ownerId, UpdateShopBankRequest request);
 }

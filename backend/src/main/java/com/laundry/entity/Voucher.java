@@ -85,7 +85,20 @@ public class Voucher {
 
     public Double calculateDiscount(Double orderTotal) {
         if (!isValidForOrder(orderTotal)) return 0.0;
-        
+        return computeDiscountAmount(orderTotal);
+    }
+
+    /**
+     * Tính lại tiền giảm giá cho đơn hàng đã áp dụng voucher từ trước (khi cân đo/điều chỉnh số lượng).
+     * Không kiểm tra lại usedCount >= usageLimit hay endDate vì voucher đã được ghi nhận lúc đặt đơn.
+     */
+    public Double calculateDiscountForExistingOrder(Double orderTotal) {
+        if (orderTotal == null || orderTotal <= 0) return 0.0;
+        if (minOrderValue != null && orderTotal < minOrderValue) return 0.0;
+        return computeDiscountAmount(orderTotal);
+    }
+
+    private Double computeDiscountAmount(Double orderTotal) {
         if (discountType == DiscountType.FIXED_AMOUNT) {
             return Math.min(discountValue, orderTotal);
         } else {

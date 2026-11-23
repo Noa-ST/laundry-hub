@@ -60,19 +60,28 @@ public class OwnerLaundryServiceImpl implements OwnerLaundryService {
     @Transactional
     public LaundryServiceResponseDTO createService(Long ownerId, CreateLaundryServiceRequestDTO request) {
         Shop shop = getShopByOwnerId(ownerId);
-        
-        if (request.priceType() == PriceType.FIXED && (request.price() == null || request.price() <= 0)) {
+        PriceType resolvedPriceType = request.priceType() != null ? request.priceType() : PriceType.FIXED;
+
+        if (resolvedPriceType == PriceType.FIXED && (request.price() == null || request.price() <= 0)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Giá cố định phải lớn hơn 0");
         }
 
         ServiceCategory category = null;
         if (request.categoryId() != null) {
-            category = categoryRepository.findById(request.categoryId()).orElse(null);
+            category = categoryRepository.findById(request.categoryId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy danh mục"));
+            if (!category.getShop().getId().equals(shop.getId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Danh mục không thuộc tiệm của bạn");
+            }
         }
         
         ServiceUnit unit = null;
         if (request.unitId() != null) {
-            unit = unitRepository.findById(request.unitId()).orElse(null);
+            unit = unitRepository.findById(request.unitId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn vị tính"));
+            if (!unit.getShop().getId().equals(shop.getId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Đơn vị tính không thuộc tiệm của bạn");
+            }
         }
 
         LaundryService service = LaundryService.builder()
@@ -80,8 +89,8 @@ public class OwnerLaundryServiceImpl implements OwnerLaundryService {
                 .name(request.name())
                 .category(category)
                 .unit(unit)
-                .priceType(request.priceType() != null ? request.priceType() : PriceType.FIXED)
-                .price(request.priceType() == PriceType.CONTACT ? null : request.price())
+                .priceType(resolvedPriceType)
+                .price(resolvedPriceType == PriceType.CONTACT ? null : request.price())
                 .minCharge(request.minCharge())
                 .description(request.description())
                 .isActive(true)
@@ -102,26 +111,35 @@ public class OwnerLaundryServiceImpl implements OwnerLaundryService {
         if (!service.getShop().getId().equals(shop.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền quản lý dịch vụ của tiệm này.");
         }
-        
-        if (request.priceType() == PriceType.FIXED && (request.price() == null || request.price() <= 0)) {
+
+        PriceType resolvedPriceType = request.priceType() != null ? request.priceType() : PriceType.FIXED;
+        if (resolvedPriceType == PriceType.FIXED && (request.price() == null || request.price() <= 0)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Giá cố định phải lớn hơn 0");
         }
 
         ServiceCategory category = null;
         if (request.categoryId() != null) {
-            category = categoryRepository.findById(request.categoryId()).orElse(null);
+            category = categoryRepository.findById(request.categoryId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy danh mục"));
+            if (!category.getShop().getId().equals(shop.getId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Danh mục không thuộc tiệm của bạn");
+            }
         }
         
         ServiceUnit unit = null;
         if (request.unitId() != null) {
-            unit = unitRepository.findById(request.unitId()).orElse(null);
+            unit = unitRepository.findById(request.unitId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn vị tính"));
+            if (!unit.getShop().getId().equals(shop.getId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Đơn vị tính không thuộc tiệm của bạn");
+            }
         }
 
         service.setName(request.name());
         service.setCategory(category);
         service.setUnit(unit);
-        service.setPriceType(request.priceType() != null ? request.priceType() : PriceType.FIXED);
-        service.setPrice(request.priceType() == PriceType.CONTACT ? null : request.price());
+        service.setPriceType(resolvedPriceType);
+        service.setPrice(resolvedPriceType == PriceType.CONTACT ? null : request.price());
         service.setMinCharge(request.minCharge());
         service.setDescription(request.description());
         service.setIsActive(request.isActive() != null ? request.isActive() : service.getIsActive());

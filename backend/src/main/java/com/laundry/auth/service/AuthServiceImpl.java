@@ -4,6 +4,7 @@ import com.laundry.auth.dto.AuthResponseDTO;
 import com.laundry.auth.dto.LoginRequestDTO;
 import com.laundry.auth.dto.RegisterRequestDTO;
 import com.laundry.entity.RefreshToken;
+import com.laundry.entity.Role;
 import com.laundry.entity.User;
 import com.laundry.repository.RefreshTokenRepository;
 import com.laundry.repository.UserRepository;
@@ -35,6 +36,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponseDTO register(RegisterRequestDTO request) {
+        if (request.getRole() != Role.CUSTOMER && request.getRole() != Role.SHOP_OWNER) {
+            throw new IllegalArgumentException("Vai trò đăng ký không hợp lệ.");
+        }
         if (!request.getPhone().matches("^(0[3|5|7|8|9])[0-9]{8}$")) {
             throw new IllegalArgumentException("Số điện thoại không hợp lệ.");
         }
@@ -42,10 +46,18 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Số điện thoại đã được đăng ký.");
         }
         
+        String email = null;
+        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
+            email = request.getEmail().trim().toLowerCase();
+            if (userRepository.existsByEmail(email)) {
+                throw new IllegalArgumentException("Email đã được đăng ký bởi tài khoản khác.");
+            }
+        }
+
         User user = User.builder()
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
-                .email(null) // No email concatenated
+                .email(email)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(request.getRole())
                 .build();
@@ -60,6 +72,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken.getToken())
                 .userId(user.getId())
                 .fullName(user.getFullName())
+                .email(user.getEmail())
                 .phone(user.getPhone())
                 .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())
@@ -69,19 +82,22 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponseDTO login(LoginRequestDTO request) {
+        String identifier = request.getPhone() != null ? request.getPhone().trim() : "";
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getPhone(), request.getPassword()));
+                new UsernamePasswordAuthenticationToken(identifier, request.getPassword()));
                 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtUtils.generateJwtToken(authentication);
         
-        User user = userRepository.findByPhone(request.getPhone())
+        User user = userRepository.findByPhone(identifier)
+                .or(() -> userRepository.findByEmail(identifier.toLowerCase()))
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng."));
                 
         if (user.getIsActive() != null && !user.getIsActive()) {
             throw new IllegalArgumentException("Tài khoản của bạn đã bị khóa hoặc chưa được phê duyệt.");
         }
-                
+
+        String subject = (user.getPhone() != null && !user.getPhone().isEmpty()) ? user.getPhone() : user.getEmail();
+        String jwt = jwtUtils.generateJwtTokenFromUsername(subject, user.getId(), user.getRole().name());
         RefreshToken refreshToken = createRefreshToken(user);
                 
         return AuthResponseDTO.builder()
@@ -89,6 +105,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken.getToken())
                 .userId(user.getId())
                 .fullName(user.getFullName())
+                .email(user.getEmail())
                 .phone(user.getPhone())
                 .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())
@@ -105,6 +122,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(null)
                 .userId(user.getId())
                 .fullName(user.getFullName())
+                .email(user.getEmail())
                 .phone(user.getPhone())
                 .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())
@@ -126,13 +144,26 @@ public class AuthServiceImpl implements AuthService {
         }
         
         User user = refreshToken.getUser();
-        String accessToken = jwtUtils.generateJwtTokenFromUsername(user.getPhone(), user.getId(), user.getRole().name());
+        if (user.getIsActive() != null && !user.getIsActive()) {
+            refreshToken.setRevoked(true);
+            refreshTokenRepository.save(refreshToken);
+            throw new IllegalArgumentException("Tài khoản của bạn đã bị khóa.");
+        }
+
+        // Rotate refresh token
+        refreshToken.setRevoked(true);
+        refreshTokenRepository.save(refreshToken);
+        RefreshToken newRefreshToken = createRefreshToken(user);
+
+        String subject = (user.getPhone() != null && !user.getPhone().isEmpty()) ? user.getPhone() : user.getEmail();
+        String accessToken = jwtUtils.generateJwtTokenFromUsername(subject, user.getId(), user.getRole().name());
         
         return AuthResponseDTO.builder()
                 .accessToken(accessToken)
-                .refreshToken(requestRefreshToken)
+                .refreshToken(newRefreshToken.getToken())
                 .userId(user.getId())
                 .fullName(user.getFullName())
+                .email(user.getEmail())
                 .phone(user.getPhone())
                 .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())
@@ -179,6 +210,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(null)
                 .userId(user.getId())
                 .fullName(user.getFullName())
+                .email(user.getEmail())
                 .phone(user.getPhone())
                 .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())

@@ -5,5 +5,7 @@ public enum DisputeStatus {
     SHOP_REVIEWING,
     ADMIN_REVIEWING,
     RESOLVED_REFUNDED,
-    REJECTED
+    REJECTED,
+    ADMIN_REJECTED,
+    CANCELLED
 }

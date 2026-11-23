@@ -149,9 +149,9 @@ const MyOrdersPage = () => {
         fetchOrders(0, false);
     }, []);
     
-    // Auto refresh when receiving notification
+    // Auto refresh when receiving any order-related notification
     useEffect(() => {
-        if (notification && notification.title === "Cập nhật đơn hàng") {
+        if (notification && (notification.orderId || notification.title === "Cập nhật đơn hàng")) {
             fetchOrders(0, false);
         }
     }, [notification]);

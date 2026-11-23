@@ -2,6 +2,8 @@ package com.laundry.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laundry.entity.Order;
+import com.laundry.enums.OrderStatus;
+import com.laundry.enums.PaymentMethod;
 import com.laundry.enums.PaymentStatus;
 import com.laundry.exception.BadRequestException;
 import com.laundry.repository.OrderRepository;
@@ -47,6 +49,9 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${payos.checksum-key:}")
     private String checksumKey;
 
+    @Value("${app.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
+
     @Override
     @Transactional
     public Map<String, Object> createPaymentLink(Long orderId) {
@@ -64,17 +69,24 @@ public class PaymentServiceImpl implements PaymentService {
             throw new BadRequestException("Vui lòng đăng nhập để thanh toán.");
         }
 
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new BadRequestException("Không thể tạo mã thanh toán cho đơn hàng đã hủy.");
+        }
+
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
             throw new IllegalArgumentException("Đơn hàng đã thanh toán");
         }
 
-        long payosOrderCode = Long.parseLong(order.getId() + "" + (System.currentTimeMillis() % 10000));
+        int amount = order.getFinalTotalPrice() != null ? order.getFinalTotalPrice().intValue() : 0;
+        if (amount <= 0) {
+            throw new BadRequestException("Số tiền thanh toán phải lớn hơn 0.");
+        }
+
+        long payosOrderCode = order.getId() * 100000L + (System.currentTimeMillis() % 100000L);
         order.setPayosOrderCode(payosOrderCode);
         orderRepository.save(order);
 
         Map<String, Object> response = new HashMap<>();
-        
-        int amount = order.getFinalTotalPrice() != null ? order.getFinalTotalPrice().intValue() : 0;
 
         if (clientId == null || clientId.trim().isEmpty()) {
             response.put("qrCode", "00020101021238580010A000000727012800069704070114190333333333330208QRIBFTTA53037045405" + amount + "5802VN62140810ORD" + order.getId() + "6304CAAF"); 
@@ -88,8 +100,9 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             String fullOrderCode = String.format("ORD-%04d", order.getId());
             String description = ("Thanh toan " + fullOrderCode);
-            String returnUrl = "http://localhost:5173/orders";
-            String cancelUrl = "http://localhost:5173/orders";
+            String baseFrontend = frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;
+            String returnUrl = baseFrontend + "/#orders";
+            String cancelUrl = baseFrontend + "/#orders";
 
             // Tạo chữ ký (Signature)
             Map<String, Object> signData = new TreeMap<>();
@@ -186,13 +199,24 @@ public class PaymentServiceImpl implements PaymentService {
             return;
         }
 
-        Object paidAmount = data.get("amount");
-        if (paidAmount != null && order.getFinalTotalPrice() != null
-                && !String.valueOf(order.getFinalTotalPrice().intValue()).equals(String.valueOf(paidAmount))) {
-            log.warn("Webhook PayOS: số tiền thanh toán ({}) khác tổng tiền hiện tại của đơn #{} ({})",
-                    paidAmount, order.getId(), order.getFinalTotalPrice());
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            log.error("Webhook PayOS: nhận thanh toán cho đơn #{} đã bị HỦY (orderCode={}). Cần kiểm tra hoàn tiền thủ công.",
+                    order.getId(), orderCode);
+            return;
         }
 
+        Object paidAmountObj = data.get("amount");
+        if (paidAmountObj != null && order.getFinalTotalPrice() != null) {
+            long expectedAmount = order.getFinalTotalPrice().longValue();
+            long actualAmount = Long.parseLong(String.valueOf(paidAmountObj));
+            if (actualAmount != expectedAmount) {
+                log.error("Webhook PayOS: lệch số tiền thanh toán cho đơn #{} (nhận={} vs đơn={}). Không tự động đánh dấu PAID.",
+                        order.getId(), actualAmount, expectedAmount);
+                return;
+            }
+        }
+
+        order.setPaymentMethod(PaymentMethod.VIETQR);
         order.setPaymentStatus(PaymentStatus.PAID);
         order.setPaidAt(java.time.Instant.now());
         orderRepository.save(order);

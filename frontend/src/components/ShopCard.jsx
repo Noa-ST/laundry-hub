@@ -79,9 +79,8 @@ const ShopCard = ({ shop, location }) => {
         }
     };
 
-    const minPrice = shop.services?.length > 0 
-        ? Math.min(...shop.services.filter(s => s.price > 0).map(s => s.price)) 
-        : 0;
+    const validPrices = (shop.services || []).filter(s => typeof s.price === 'number' && s.price > 0).map(s => s.price);
+    const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
 
     return (
         <>

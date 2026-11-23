@@ -331,14 +331,14 @@ const VoucherTab = () => {
                             </div>
                             
                             <div className="flex items-center pt-1">
-                                <label className="flex items-center cursor-pointer">
+                                <label className="relative flex items-center cursor-pointer">
                                     <input 
                                         type="checkbox" 
                                         checked={formData.isActive} 
                                         onChange={e => setFormData({...formData, isActive: e.target.checked})} 
                                         className="sr-only peer" 
                                     />
-                                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-slate-900"></div>
+                                    <div className="relative w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-slate-900"></div>
                                     <span className="ml-3 text-sm font-medium text-slate-700">Kích hoạt mã giảm giá</span>
                                 </label>
                             </div>

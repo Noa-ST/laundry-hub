@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final com.laundry.service.PasswordResetService passwordResetService;
+    private final com.laundry.service.GoogleAuthService googleAuthService;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponseDTO>> register(@Valid @RequestBody RegisterRequestDTO request) {
@@ -30,6 +32,31 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponseDTO>> login(@Valid @RequestBody LoginRequestDTO request) {
         AuthResponseDTO response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", response));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<AuthResponseDTO>> googleLogin(@RequestBody java.util.Map<String, String> request) {
+        String credential = request.get("credential");
+        if (credential == null || credential.trim().isEmpty()) {
+            credential = request.get("idToken");
+        }
+        AuthResponseDTO response = googleAuthService.loginWithGoogle(credential);
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập Google thành công", response));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> forgotPassword(@RequestBody java.util.Map<String, String> request) {
+        String email = request.get("email");
+        java.util.Map<String, String> result = passwordResetService.requestPasswordReset(email);
+        return ResponseEntity.ok(ApiResponse.success(result.get("message"), result));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> resetPassword(@RequestBody java.util.Map<String, String> request) {
+        String token = request.get("token");
+        String newPassword = request.get("newPassword");
+        java.util.Map<String, String> result = passwordResetService.resetPassword(token, newPassword);
+        return ResponseEntity.ok(ApiResponse.success(result.get("message"), result));
     }
 
     @GetMapping("/me")

@@ -4,6 +4,7 @@ import com.laundry.dto.request.UserAddressRequestDTO;
 import com.laundry.dto.response.UserAddressResponseDTO;
 import com.laundry.entity.User;
 import com.laundry.entity.UserAddress;
+import com.laundry.exception.ResourceNotFoundException;
 import com.laundry.repository.UserAddressRepository;
 import com.laundry.repository.UserRepository;
 import com.laundry.service.UserAddressService;
@@ -31,9 +32,9 @@ public class UserAddressServiceImpl implements UserAddressService {
     @Transactional
     public UserAddressResponseDTO addAddress(Long userId, UserAddressRequestDTO request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
-        if (request.getIsDefault() != null && request.getIsDefault()) {
+        if (Boolean.TRUE.equals(request.getIsDefault())) {
             clearDefaultAddresses(userId);
         }
 
@@ -46,7 +47,7 @@ public class UserAddressServiceImpl implements UserAddressService {
                 .address(request.getAddress())
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
-                .isDefault(isFirst || (request.getIsDefault() != null && request.getIsDefault()))
+                .isDefault(isFirst || Boolean.TRUE.equals(request.getIsDefault()))
                 .build();
 
         return mapToDTO(addressRepository.save(address));
@@ -56,9 +57,9 @@ public class UserAddressServiceImpl implements UserAddressService {
     @Transactional
     public UserAddressResponseDTO updateAddress(Long userId, Long addressId, UserAddressRequestDTO request) {
         UserAddress address = addressRepository.findByIdAndUserId(addressId, userId)
-                .orElseThrow(() -> new RuntimeException("Address not found or doesn't belong to you"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy địa chỉ hoặc bạn không có quyền truy cập"));
 
-        if (request.getIsDefault() != null && request.getIsDefault()) {
+        if (Boolean.TRUE.equals(request.getIsDefault())) {
             clearDefaultAddresses(userId);
         }
 
@@ -77,15 +78,25 @@ public class UserAddressServiceImpl implements UserAddressService {
     @Transactional
     public void deleteAddress(Long userId, Long addressId) {
         UserAddress address = addressRepository.findByIdAndUserId(addressId, userId)
-                .orElseThrow(() -> new RuntimeException("Address not found or doesn't belong to you"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy địa chỉ hoặc bạn không có quyền truy cập"));
+        boolean wasDefault = Boolean.TRUE.equals(address.getIsDefault());
         addressRepository.delete(address);
+
+        if (wasDefault) {
+            List<UserAddress> remaining = addressRepository.findByUserIdOrderByIdDesc(userId);
+            if (!remaining.isEmpty()) {
+                UserAddress nextDefault = remaining.get(0);
+                nextDefault.setIsDefault(true);
+                addressRepository.save(nextDefault);
+            }
+        }
     }
 
     @Override
     @Transactional
     public UserAddressResponseDTO setDefaultAddress(Long userId, Long addressId) {
         UserAddress address = addressRepository.findByIdAndUserId(addressId, userId)
-                .orElseThrow(() -> new RuntimeException("Address not found or doesn't belong to you"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy địa chỉ hoặc bạn không có quyền truy cập"));
         
         clearDefaultAddresses(userId);
         address.setIsDefault(true);
@@ -95,7 +106,7 @@ public class UserAddressServiceImpl implements UserAddressService {
     private void clearDefaultAddresses(Long userId) {
         List<UserAddress> addresses = addressRepository.findByUserIdOrderByIdDesc(userId);
         for (UserAddress addr : addresses) {
-            if (addr.getIsDefault()) {
+            if (Boolean.TRUE.equals(addr.getIsDefault())) {
                 addr.setIsDefault(false);
                 addressRepository.save(addr);
             }

@@ -17,7 +17,11 @@ const SupportChatWidget = () => {
     const [unreadCount, setUnreadCount] = useState(0);
 
     const messagesContainerRef = useRef(null);
+    const isOpenRef = useRef(isOpen);
 
+    useEffect(() => {
+        isOpenRef.current = isOpen;
+    }, [isOpen]);
 
     const scrollToBottom = () => {
         if (messagesContainerRef.current) {
@@ -25,40 +29,29 @@ const SupportChatWidget = () => {
         }
     };
 
-    // Fetch conversation on mount or auth change
+    // Reset state on logout or admin switch
     useEffect(() => {
         if (!isAuthenticated || currentUser?.role === 'ADMIN') {
             setConversation(null);
             setMessages([]);
             setUnreadCount(0);
-            return;
         }
+    }, [isAuthenticated, currentUser?.id, currentUser?.role]);
 
-        const fetchConversation = async () => {
-            try {
-                const res = await axiosClient.get('/support/my-conversation');
-                if (res?.success && res.data) {
-                    setConversation(res.data);
-                    setUnreadCount(res.data.unreadUserCount || 0);
-                }
-            } catch (err) {
-                console.error("Lỗi lấy thông tin hội thoại CSKH:", err);
-            }
-        };
-
-        fetchConversation();
-    }, [isAuthenticated, currentUser]);
-
-    // Fetch messages when widget is opened
+    // Fetch/create conversation & messages ONLY when widget is opened (tránh tạo hội thoại rác cho mọi user mới login)
     useEffect(() => {
         if (!isOpen || !isAuthenticated || currentUser?.role === 'ADMIN') return;
 
-        const fetchMessages = async () => {
+        const fetchConversationAndMessages = async () => {
             setLoading(true);
             try {
-                const res = await axiosClient.get('/support/my-conversation/messages');
-                if (res?.success && res.data) {
-                    setMessages(res.data);
+                const convRes = await axiosClient.get('/support/my-conversation');
+                if (convRes?.success && convRes.data) {
+                    setConversation(convRes.data);
+                }
+                const msgRes = await axiosClient.get('/support/my-conversation/messages');
+                if (msgRes?.success && msgRes.data) {
+                    setMessages(msgRes.data);
                     setUnreadCount(0);
                 }
             } catch (err) {
@@ -68,49 +61,49 @@ const SupportChatWidget = () => {
             }
         };
 
-        fetchMessages();
-    }, [isOpen, isAuthenticated]);
+        fetchConversationAndMessages();
+    }, [isOpen, isAuthenticated, currentUser?.role]);
 
-    // WebSocket subscription for realtime updates
+    // WebSocket subscription for realtime updates (không đưa isOpen vào deps để tránh resubscribe mỗi lần đóng/mở)
     useEffect(() => {
         if (!connected || !stompClient || !isAuthenticated || currentUser?.role === 'ADMIN') return;
 
         let convSub = null;
         let userSub = null;
 
+        const handleIncomingMessage = (data) => {
+            if (data.content && data.senderRole) {
+                setMessages(prev => {
+                    if (prev.some(m => m.id === data.id)) return prev;
+                    return [...prev, data];
+                });
+                if (!isOpenRef.current && data.senderRole === 'ADMIN') {
+                    setUnreadCount(prev => prev + 1);
+                    toast("Có phản hồi mới từ CSKH LaundryHub!");
+                }
+            } else if (data.status) {
+                setConversation(prev => (prev ? { ...prev, status: data.status } : prev));
+            }
+        };
+
         if (conversation?.id) {
             convSub = stompClient.subscribe(`/topic/support/${conversation.id}`, (msg) => {
                 if (msg.body) {
-                    const data = JSON.parse(msg.body);
-                    // If it's a message
-                    if (data.content && data.senderRole) {
-                        setMessages(prev => {
-                            if (prev.some(m => m.id === data.id)) return prev;
-                            return [...prev, data];
-                        });
-                        if (!isOpen && data.senderRole === 'ADMIN') {
-                            setUnreadCount(prev => prev + 1);
-                            toast("Có phản hồi mới từ CSKH LaundryHub!");
-                        }
-                    } else if (data.status) {
-                        // Conversation status update
-                        setConversation(prev => ({ ...prev, status: data.status }));
+                    try {
+                        handleIncomingMessage(JSON.parse(msg.body));
+                    } catch (e) {
+                        console.error('Lỗi đọc payload support chat:', e);
                     }
                 }
             });
-        }
-
-        // Also subscribe to personal notification channel
-        if (currentUser?.id) {
+        } else if (currentUser?.id) {
+            // Chỉ lắng nghe kênh cá nhân khi chưa có conversation.id để tránh nhận trùng 2 lần
             userSub = stompClient.subscribe(`/topic/user/${currentUser.id}/support`, (msg) => {
                 if (msg.body) {
-                    const data = JSON.parse(msg.body);
-                    setMessages(prev => {
-                        if (prev.some(m => m.id === data.id)) return prev;
-                        return [...prev, data];
-                    });
-                    if (!isOpen) {
-                        setUnreadCount(prev => prev + 1);
+                    try {
+                        handleIncomingMessage(JSON.parse(msg.body));
+                    } catch (e) {
+                        console.error('Lỗi đọc payload support user channel:', e);
                     }
                 }
             });
@@ -120,7 +113,7 @@ const SupportChatWidget = () => {
             if (convSub) convSub.unsubscribe();
             if (userSub) userSub.unsubscribe();
         };
-    }, [connected, stompClient, conversation?.id, currentUser?.id, isOpen, isAuthenticated]);
+    }, [connected, stompClient, conversation?.id, currentUser?.id, currentUser?.role, isAuthenticated]);
 
     useEffect(() => {
         if (isOpen) {

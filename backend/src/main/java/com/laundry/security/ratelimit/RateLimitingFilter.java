@@ -35,7 +35,12 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         String method = request.getMethod();
 
         if ("POST".equalsIgnoreCase(method) && 
-            (path.endsWith("/api/v1/auth/login") || path.endsWith("/api/v1/auth/register"))) {
+            (path.endsWith("/api/v1/auth/login") || 
+             path.endsWith("/api/v1/auth/register") ||
+             path.endsWith("/api/v1/auth/google") ||
+             path.endsWith("/api/v1/auth/refresh-token") ||
+             path.endsWith("/api/v1/auth/forgot-password") ||
+             path.endsWith("/api/v1/auth/reset-password"))) {
 
             String clientIp = getClientIp(request);
             String rateLimitKey = clientIp + ":" + path;
@@ -59,14 +64,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        String cfConnectingIp = request.getHeader("CF-Connecting-IP");
-        if (cfConnectingIp != null && !cfConnectingIp.isBlank()) {
-            return cfConnectingIp.trim();
-        }
+        // Không tự đọc X-Forwarded-For để tránh IP spoofing;
+        // Spring Boot với server.forward-headers-strategy=framework sẽ xử lý remoteAddr từ reverse proxy đáng tin cậy.
         return request.getRemoteAddr();
     }
 }

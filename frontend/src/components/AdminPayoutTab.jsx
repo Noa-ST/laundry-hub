@@ -5,23 +5,27 @@ import toast from 'react-hot-toast';
 
 const BANK_CODE_MAP = {
     'MBBank': 'MB',
+    'MBBank (Quân Đội)': 'MB',
     'Vietcombank': 'VCB',
     'Techcombank': 'TCB',
     'VPBank': 'VPB',
     'ACB': 'ACB',
+    'ACB (Á Châu)': 'ACB',
     'BIDV': 'BIDV',
     'Agribank': 'VBA',
     'TPBank': 'TPB',
     'Sacombank': 'STB',
     'HDBank': 'HDB',
     'OCB': 'OCB',
+    'OCB (Phương Đông)': 'OCB',
     'VIB': 'VIB',
     'SHB': 'SHB'
 };
 
 const getVietQrCode = (bankName) => {
     if (!bankName) return 'MB';
-    return BANK_CODE_MAP[bankName] || bankName;
+    const cleanName = bankName.split('(')[0].trim();
+    return BANK_CODE_MAP[bankName] || BANK_CODE_MAP[cleanName] || cleanName;
 };
 
 const formatMoney = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val || 0);

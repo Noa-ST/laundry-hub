@@ -1,0 +1,16 @@
+package com.laundry.repository;
+
+import com.laundry.entity.PasswordResetToken;
+import com.laundry.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+@Repository
+public interface PasswordResetTokenRepository extends JpaRepository<PasswordResetToken, Long> {
+    Optional<PasswordResetToken> findByToken(String token);
+    long countByUserAndExpiryDateAfterAndUsedFalse(User user, LocalDateTime now);
+    void deleteByExpiryDateBefore(LocalDateTime now);
+}

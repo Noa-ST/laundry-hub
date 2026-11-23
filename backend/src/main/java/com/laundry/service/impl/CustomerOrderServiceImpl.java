@@ -4,9 +4,11 @@ import com.laundry.dto.response.OrderItemResponseDTO;
 import com.laundry.dto.response.OrderResponseDTO;
 import com.laundry.entity.Order;
 import com.laundry.enums.OrderStatus;
+import com.laundry.enums.PaymentStatus;
 import com.laundry.exception.BadRequestException;
 import com.laundry.repository.OrderRepository;
 import com.laundry.service.CustomerOrderService;
+import com.laundry.service.NotificationService;
 import com.laundry.service.OrderStateMachineService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     private final OrderRepository orderRepository;
     private final OrderStateMachineService orderStateMachineService;
     private final com.laundry.repository.VoucherRepository voucherRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -37,6 +40,10 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             throw new BadRequestException("Chỉ có thể hủy đơn khi đơn hàng đang chờ xác nhận (PENDING).");
         }
 
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new BadRequestException("Không thể tự hủy đơn hàng đã thanh toán. Vui lòng liên hệ tiệm hoặc CSKH để được hỗ trợ.");
+        }
+
         orderStateMachineService.transitionTo(order, OrderStatus.CANCELLED, "Khách hàng tự hủy", "CUSTOMER");
 
         if (order.getVoucher() != null) {
@@ -46,8 +53,17 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 voucherRepository.save(voucher);
             }
         }
-        
-        return mapToDTO(orderRepository.save(order));
+
+        Order savedOrder = orderRepository.save(order);
+        if (savedOrder.getShop() != null && savedOrder.getShop().getOwner() != null) {
+            notificationService.sendOrderNotification(
+                savedOrder.getShop().getOwner().getId(),
+                "Khách hàng đã hủy đơn",
+                "Khách hàng đã tự hủy đơn hàng #ORD-" + String.format("%04d", savedOrder.getId()) + ".",
+                savedOrder.getId()
+            );
+        }
+        return mapToDTO(savedOrder);
     }
 
     private OrderResponseDTO mapToDTO(Order order) {

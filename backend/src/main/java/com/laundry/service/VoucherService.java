@@ -21,18 +21,25 @@ public class VoucherService {
     private final VoucherRepository voucherRepository;
     private final ShopRepository shopRepository;
 
+    @Transactional
     public VoucherResponseDTO createVoucher(Long ownerId, VoucherRequestDTO request) {
         Shop shop = shopRepository.findFirstByOwnerId(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shop not found for owner"));
 
-        // Check if code exists
-        if (voucherRepository.findByShopIdAndCode(shop.getId(), request.code()).isPresent()) {
+        String normalizedCode = request.code() != null ? request.code().trim().toUpperCase() : "";
+        if (normalizedCode.isEmpty()) {
+            throw new IllegalArgumentException("Mã giảm giá không được để trống");
+        }
+        validateVoucherRequest(request);
+
+        // Check if code exists (case-insensitive via normalized uppercase)
+        if (voucherRepository.findByShopIdAndCode(shop.getId(), normalizedCode).isPresent()) {
             throw new IllegalArgumentException("Mã giảm giá đã tồn tại trong tiệm này");
         }
 
         Voucher voucher = Voucher.builder()
                 .shop(shop)
-                .code(request.code().toUpperCase())
+                .code(normalizedCode)
                 .discountType(Voucher.DiscountType.valueOf(request.discountType()))
                 .discountValue(request.discountValue())
                 .maxDiscountAmount(request.maxDiscountAmount())
@@ -59,6 +66,7 @@ public class VoucherService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public VoucherResponseDTO updateVoucher(Long ownerId, Long voucherId, VoucherRequestDTO request) {
         Shop shop = shopRepository.findFirstByOwnerId(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shop not found for owner"));
@@ -66,11 +74,17 @@ public class VoucherService {
         Voucher voucher = voucherRepository.findByIdAndShopId(voucherId, shop.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Voucher not found"));
 
-        if (!voucher.getCode().equalsIgnoreCase(request.code())) {
-            if (voucherRepository.findByShopIdAndCode(shop.getId(), request.code()).isPresent()) {
+        String normalizedCode = request.code() != null ? request.code().trim().toUpperCase() : "";
+        if (normalizedCode.isEmpty()) {
+            throw new IllegalArgumentException("Mã giảm giá không được để trống");
+        }
+        validateVoucherRequest(request);
+
+        if (!voucher.getCode().equalsIgnoreCase(normalizedCode)) {
+            if (voucherRepository.findByShopIdAndCode(shop.getId(), normalizedCode).isPresent()) {
                 throw new IllegalArgumentException("Mã giảm giá đã tồn tại trong tiệm này");
             }
-            voucher.setCode(request.code().toUpperCase());
+            voucher.setCode(normalizedCode);
         }
 
         voucher.setDiscountType(Voucher.DiscountType.valueOf(request.discountType()));
@@ -86,6 +100,19 @@ public class VoucherService {
         }
 
         return mapToDTO(voucherRepository.save(voucher));
+    }
+
+    private void validateVoucherRequest(VoucherRequestDTO request) {
+        if (request.discountValue() == null || request.discountValue() <= 0) {
+            throw new IllegalArgumentException("Giá trị giảm giá phải lớn hơn 0");
+        }
+        Voucher.DiscountType type = Voucher.DiscountType.valueOf(request.discountType());
+        if (type == Voucher.DiscountType.PERCENTAGE && request.discountValue() > 100) {
+            throw new IllegalArgumentException("Phần trăm giảm giá không được vượt quá 100%");
+        }
+        if (request.startDate() != null && request.endDate() != null && request.endDate().isBefore(request.startDate())) {
+            throw new IllegalArgumentException("Ngày kết thúc phải sau ngày bắt đầu");
+        }
     }
 
     @Transactional

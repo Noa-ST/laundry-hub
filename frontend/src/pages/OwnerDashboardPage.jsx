@@ -94,6 +94,23 @@ const OwnerDashboardPage = () => {
         }
     };
 
+    const [isResubmitting, setIsResubmitting] = useState(false);
+
+    const handleResubmitShop = async () => {
+        setIsResubmitting(true);
+        try {
+            const res = await axiosClient.post('/owner/my-shop/resubmit');
+            if (res.success) {
+                toast.success('Đã gửi lại yêu cầu xét duyệt thành công!');
+                fetchDashboardData();
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Lỗi khi gửi yêu cầu xét duyệt');
+        } finally {
+            setIsResubmitting(false);
+        }
+    };
+
     const fetchOrders = async (pageNum = 0, append = false, currentActiveTab = activeTab) => {
         try {
             if (append) setLoadingMore(true);
@@ -102,6 +119,7 @@ const OwnerDashboardPage = () => {
             if (currentActiveTab !== 'ALL') {
                 let statuses = [];
                 if (currentActiveTab === 'PENDING') statuses = ['PENDING'];
+                else if (currentActiveTab === 'CONFIRMED') statuses = ['CONFIRMED'];
                 else if (currentActiveTab === 'PICKING_UP') statuses = ['PICKING_UP'];
                 else if (currentActiveTab === 'WASHING') statuses = ['RECEIVED', 'PROCESSING'];
                 else if (currentActiveTab === 'LOGISTICS') statuses = ['READY', 'DELIVERING'];
@@ -359,6 +377,7 @@ const OwnerDashboardPage = () => {
     const tabs = [
         { id: 'ALL', label: 'Tất cả' },
         { id: 'PENDING', label: 'Chờ duyệt' },
+        { id: 'CONFIRMED', label: 'Đã nhận đơn' },
         { id: 'PICKING_UP', label: 'Đang đi lấy' },
         { id: 'WASHING', label: 'Đang giặt' },
         { id: 'LOGISTICS', label: 'Chờ giao/lấy' },
@@ -429,9 +448,19 @@ const OwnerDashboardPage = () => {
         }
 
         if (isTableMode) {
+            const canInspect = ['CONFIRMED', 'PICKING_UP', 'RECEIVED'].includes(status) && order.paymentStatus !== 'PAID';
             return (
                 <div className="flex items-center gap-2 justify-end w-full">
                     {actions}
+                    {canInspect && (
+                        <button
+                            onClick={() => setInspectOrder(order)}
+                            className="text-indigo-600 hover:text-indigo-800 text-xs font-semibold px-2 py-1 transition-colors hover:bg-indigo-50 rounded whitespace-nowrap"
+                            title="Cân đo thực tế / Chốt giá dịch vụ"
+                        >
+                            Cân đo
+                        </button>
+                    )}
                     <button 
                         onClick={() => setChatOrder(order)}
                         className="flex items-center gap-1.5 text-teal-600 hover:text-teal-800 text-xs font-semibold px-2 py-1 transition-colors hover:bg-teal-50 rounded"
@@ -522,9 +551,19 @@ const OwnerDashboardPage = () => {
                             {hasShop && shopData?.name ? shopData.name : 'Khởi tạo Tiệm Giặt'}
                         </h1>
                         {hasShop && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 uppercase tracking-wide shrink-0 hidden sm:inline-block">
-                                Đang mở cửa
-                            </span>
+                            shopData?.approvalStatus === 'PENDING_APPROVAL' ? (
+                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md border border-amber-300 bg-amber-50 text-amber-800 uppercase tracking-wide shrink-0">
+                                    Đang chờ duyệt
+                                </span>
+                            ) : shopData?.approvalStatus === 'REJECTED' ? (
+                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md border border-rose-300 bg-rose-50 text-rose-800 uppercase tracking-wide shrink-0">
+                                    Bị từ chối
+                                </span>
+                            ) : (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 uppercase tracking-wide shrink-0 hidden sm:inline-block">
+                                    Đang mở cửa
+                                </span>
+                            )
                         )}
                     </div>
                     
@@ -587,6 +626,50 @@ const OwnerDashboardPage = () => {
 
             {/* Main Content Area */}
             <div className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-8 min-w-0">
+                {/* Status Notice Banner for Pending or Rejected Shops */}
+                {hasShop && shopData?.approvalStatus === 'PENDING_APPROVAL' && (
+                    <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 shadow-sm flex items-start gap-3.5 animate-fade-in">
+                        <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </div>
+                        <div className="flex-1 text-xs">
+                            <h4 className="font-bold text-amber-900 text-sm">Hồ sơ tiệm đang chờ Ban Quản Trị phê duyệt</h4>
+                            <p className="text-amber-700 mt-1 leading-relaxed">
+                                Tiệm của bạn đang được xét duyệt thông tin trước khi chính thức lên sàn. Khách hàng chưa thể tìm thấy tiệm trên ứng dụng, nhưng bạn vẫn có thể thiết lập dịch vụ, cập nhật bảng giá và hình ảnh tiệm.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {hasShop && shopData?.approvalStatus === 'REJECTED' && (
+                    <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-rose-50 to-red-50 border border-rose-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
+                        <div className="flex items-start gap-3.5">
+                            <div className="w-9 h-9 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                            </div>
+                            <div className="text-xs">
+                                <h4 className="font-bold text-rose-900 text-sm">Hồ sơ đăng ký tiệm chưa được phê duyệt</h4>
+                                <p className="text-rose-700 mt-1">
+                                    <span className="font-semibold">Lý do: </span>
+                                    {shopData.rejectionReason || 'Thông tin tiệm chưa đáp ứng tiêu chuẩn của hệ thống.'}
+                                </p>
+                                <p className="text-rose-600/80 mt-0.5">
+                                    Vui lòng kiểm tra lại thông tin tiệm trong tab "Thông tin Tiệm" và gửi lại yêu cầu để được kiểm duyệt.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            disabled={isResubmitting}
+                            onClick={handleResubmitShop}
+                            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 whitespace-nowrap disabled:opacity-50"
+                        >
+                            {isResubmitting ? 'Đang gửi...' : 'Gửi lại yêu cầu duyệt'}
+                        </button>
+                    </div>
+                )}
                 
                 {/* -------------------- TAB: STATISTICS -------------------- */}
                 {mainTab === 'statistics' && hasShop && (

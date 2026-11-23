@@ -1,5 +1,6 @@
 package com.laundry.security.ratelimit;
 
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ public class RateLimiterService {
     /**
      * Dọn dẹp các mục đã hết hạn định kỳ để giải phóng bộ nhớ.
      */
+    @Scheduled(fixedRate = 300000)
     public void cleanup() {
         long now = System.currentTimeMillis();
         Iterator<Map.Entry<String, List<Long>>> it = requestCounts.entrySet().iterator();

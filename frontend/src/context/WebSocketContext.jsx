@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
 import { useAuth } from './AuthContext';
@@ -14,6 +14,7 @@ export const WebSocketProvider = ({ children }) => {
     const [stompClient, setStompClient] = useState(null);
     const [notification, setNotification] = useState(null);
     const [connected, setConnected] = useState(false);
+    const hideTimerRef = useRef(null);
 
     useEffect(() => {
         if (!currentUser || !currentUser.userId) {
@@ -33,8 +34,9 @@ export const WebSocketProvider = ({ children }) => {
 
         const client = new Client({
             webSocketFactory: () => new SockJS(socketUrl),
-            connectHeaders: {
-                Authorization: `Bearer ${token}`,
+            beforeConnect: () => {
+                const latestToken = localStorage.getItem('access_token');
+                client.connectHeaders = latestToken ? { Authorization: `Bearer ${latestToken}` } : {};
             },
             reconnectDelay: 5000,
             heartbeatIncoming: 4000,
@@ -54,18 +56,29 @@ export const WebSocketProvider = ({ children }) => {
                         try {
                             const audio = new Audio('/bell.mp3');
                             audio.play().catch(() => {});
-                        } catch(e) {}
+                        } catch (e) {
+                            // Ignore audio autoplay restriction
+                        }
 
                         // Set notification state to show popup
                         setNotification(payload);
                         
-                        // Auto hide after 5s
-                        setTimeout(() => setNotification(null), 5000);
+                        // Auto hide after 5s (clear timer cũ để tránh tắt sớm thông báo mới)
+                        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+                        hideTimerRef.current = setTimeout(() => setNotification(null), 5000);
                     } catch (e) {
                         console.error("Lỗi đọc payload notification:", e);
                     }
                 }
             });
+        };
+
+        client.onDisconnect = () => {
+            setConnected(false);
+        };
+
+        client.onWebSocketClose = () => {
+            setConnected(false);
         };
 
         client.onStompError = (frame) => {
@@ -80,6 +93,7 @@ export const WebSocketProvider = ({ children }) => {
         setStompClient(client);
 
         return () => {
+            if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
             setConnected(false);
             if (client) {
                 try {

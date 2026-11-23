@@ -110,6 +110,7 @@ public class DataSeeder implements CommandLineRunner {
                     .totalWashers(random.nextInt(10) + 5)
                     .totalDryers(random.nextInt(10) + 5)
                     .isActive(true)
+                    .approvalStatus(com.laundry.enums.ShopApprovalStatus.APPROVED)
                     .rating(4.0 + random.nextDouble()) // 4.0 -> 5.0
                     .reviewCount(random.nextInt(100))
                     .baseShippingFee(15000.0)

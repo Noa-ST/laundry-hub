@@ -77,7 +77,7 @@ public class SecurityConfig {
                                 .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
                         )
                         .contentSecurityPolicy(csp -> csp
-                                .policyDirectives("default-src 'self'; script-src 'self'; img-src 'self' data: blob: https://res.cloudinary.com https://*.openstreetmap.org https://*.mapbox.com; connect-src 'self' https://res.cloudinary.com https://api.mapbox.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
+                                .policyDirectives("default-src 'self'; script-src 'self' https://accounts.google.com; frame-src 'self' https://accounts.google.com; img-src 'self' data: blob: https://res.cloudinary.com https://img.vietqr.io https://*.googleusercontent.com https://*.openstreetmap.org https://*.mapbox.com; connect-src 'self' https://accounts.google.com https://res.cloudinary.com https://api.mapbox.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
                         )
                 )
                 .exceptionHandling(exception -> exception
@@ -86,7 +86,15 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers(
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/google",
+                                "/api/v1/auth/refresh-token",
+                                "/api/v1/auth/forgot-password",
+                                "/api/v1/auth/reset-password"
+                        ).permitAll()
+                        .requestMatchers("/api/v1/auth/me", "/api/v1/auth/me/**", "/api/v1/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/shops/*/reviews").hasRole("CUSTOMER")
                         .requestMatchers("/api/v1/shops/**").permitAll()
                         .requestMatchers("/api/v1/health").permitAll()

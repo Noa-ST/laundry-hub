@@ -34,11 +34,11 @@ public class StatisticsService {
         LocalDateTime prevEndDate;
 
         if ("7days".equalsIgnoreCase(period)) {
-            startDate = now.minusDays(7).with(LocalTime.MIN);
+            startDate = now.minusDays(6).with(LocalTime.MIN);
             prevStartDate = startDate.minusDays(7);
             prevEndDate = startDate.minusNanos(1);
         } else if ("30days".equalsIgnoreCase(period)) {
-            startDate = now.minusDays(30).with(LocalTime.MIN);
+            startDate = now.minusDays(29).with(LocalTime.MIN);
             prevStartDate = startDate.minusDays(30);
             prevEndDate = startDate.minusNanos(1);
         } else if ("thisMonth".equalsIgnoreCase(period)) {
@@ -50,7 +50,7 @@ public class StatisticsService {
             prevStartDate = startDate.minusYears(1);
             prevEndDate = startDate.minusNanos(1);
         } else {
-            startDate = now.minusDays(7).with(LocalTime.MIN);
+            startDate = now.minusDays(6).with(LocalTime.MIN);
             prevStartDate = startDate.minusDays(7);
             prevEndDate = startDate.minusNanos(1);
         }
@@ -206,24 +206,22 @@ public class StatisticsService {
 
                 if (isCash) {
                     cash++;
-                    if (o.getPaymentStatus() == PaymentStatus.PAID) {
+                    if (o.getStatus() == OrderStatus.COMPLETED && o.getPaymentStatus() == PaymentStatus.PAID) {
                         cashRevenue += val;
                     }
                 } else if (isVietQr) {
                     vietQr++;
-                    if (o.getPaymentStatus() == PaymentStatus.PAID) {
+                    if (o.getStatus() == OrderStatus.COMPLETED && o.getPaymentStatus() == PaymentStatus.PAID) {
                         vietQrRevenue += val;
                     }
                 }
             }
         }
 
-        // Channel mock (since we don't track explicitly if created by owner vs app)
-        // Let's assume orders without an explicit customer ID that is not shop owner are POS
-        // But since we use customerId anyway, let's just make up a stat based on receiverName presence (POS usually fills receiverName directly)
         int pos = 0, app = 0;
         for (Order o : currentOrders) {
-            if (o.getCustomer() == null || (o.getReceiverName() != null && !o.getReceiverName().trim().isEmpty() && !o.getCustomer().getFullName().equals(o.getReceiverName()))) {
+            String customerName = o.getCustomer() != null ? o.getCustomer().getFullName() : null;
+            if (o.getCustomer() == null || (o.getReceiverName() != null && !o.getReceiverName().trim().isEmpty() && !o.getReceiverName().equals(customerName))) {
                 pos++;
             } else {
                 app++;

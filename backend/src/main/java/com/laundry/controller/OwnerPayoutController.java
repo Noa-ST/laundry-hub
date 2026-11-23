@@ -38,8 +38,8 @@ public class OwnerPayoutController {
 
     @GetMapping("/{id}/orders")
     public ResponseEntity<ApiResponse<List<OrderResponseDTO>>> getOrdersInPayout(@PathVariable Long id) {
-        // Có thể kiểm tra quyền xem đợt giải ngân này
-        List<OrderResponseDTO> orders = shopPayoutService.getOrdersInPayout(id);
+        Long ownerId = SecurityUtils.getCurrentUserId();
+        List<OrderResponseDTO> orders = shopPayoutService.getOrdersInPayoutForOwner(ownerId, id);
         return ResponseEntity.ok(ApiResponse.success(orders));
     }
 

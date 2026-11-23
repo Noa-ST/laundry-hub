@@ -35,14 +35,16 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public String getUsername() {
-        return user.getPhone();
+        return (user.getPhone() != null && !user.getPhone().isEmpty()) ? user.getPhone() : user.getEmail();
     }
 
     @Override
     public boolean isAccountNonExpired() { return true; }
 
     @Override
-    public boolean isAccountNonLocked() { return true; }
+    public boolean isAccountNonLocked() { 
+        return user.getIsActive() != null ? user.getIsActive() : true; 
+    }
 
     @Override
     public boolean isCredentialsNonExpired() { return true; }

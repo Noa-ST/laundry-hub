@@ -20,7 +20,9 @@ const STATUS_CONFIG = {
     SHOP_REVIEWING: { label: 'Tiệm đang kiểm tra', color: 'bg-blue-50 text-blue-700 border-blue-200' },
     ADMIN_REVIEWING: { label: 'Admin đang xử lý tranh chấp', color: 'bg-purple-50 text-purple-700 border-purple-200' },
     RESOLVED_REFUNDED: { label: 'Đã giải quyết bồi thường', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    REJECTED: { label: 'Tiệm từ chối khiếu nại', color: 'bg-rose-50 text-rose-700 border-rose-200' }
+    REJECTED: { label: 'Tiệm từ chối khiếu nại', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+    ADMIN_REJECTED: { label: 'Admin đã bác bỏ khiếu nại', color: 'bg-slate-100 text-slate-700 border-slate-200' },
+    CANCELLED: { label: 'Khách hàng đã rút khiếu nại', color: 'bg-slate-100 text-slate-600 border-slate-200' }
 };
 
 const DisputeModal = ({ isOpen, onClose, order, onSuccess }) => {

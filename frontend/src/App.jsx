@@ -1,21 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useAuth } from './context/AuthContext';
-import axiosClient from './api/axiosClient';
 import ShopDiscoveryPage from './pages/ShopDiscoveryPage';
-import MyOrdersPage from './pages/MyOrdersPage';
-import OwnerDashboardPage from './pages/OwnerDashboardPage';
 import UserProfile from './components/UserProfile';
 import NotificationBell from './components/NotificationBell';
-import AdminDashboardPage from './pages/AdminDashboardPage';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
 import SupportChatWidget from './components/SupportChatWidget';
 import { Toaster } from 'react-hot-toast';
 
+const MyOrdersPage = lazy(() => import('./pages/MyOrdersPage'));
+const OwnerDashboardPage = lazy(() => import('./pages/OwnerDashboardPage'));
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+
+const PageLoader = () => (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+);
+
 const OwnerRoute = () => {
     return (
         <div className="relative min-h-screen bg-slate-50">
-            <OwnerDashboardPage />
+            <Suspense fallback={<PageLoader />}>
+                <OwnerDashboardPage />
+            </Suspense>
             <SupportChatWidget />
             <Toaster position="top-center" />
         </div>
@@ -31,7 +40,12 @@ function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
+        const path = window.location.pathname;
         const hash = window.location.hash.replace('#', '') || 'discovery';
+        if (path === '/reset-password' || hash.startsWith('reset-password')) {
+            setCurrentTab('reset-password');
+            return;
+        }
         if (hash === 'orders' && !isAuthenticated) {
             window.dispatchEvent(new Event('auth:required'));
             window.location.hash = 'discovery';
@@ -64,6 +78,36 @@ function App() {
       );
   }
 
+  // Reset Password Page View
+  if (currentTab === 'reset-password') {
+      return (
+          <>
+              <Suspense fallback={<PageLoader />}>
+                  <ResetPasswordPage 
+                      onNavigateHome={() => {
+                          window.history.pushState(null, '', '/');
+                          window.location.hash = 'discovery';
+                          setCurrentTab('discovery');
+                      }}
+                      onOpenLogin={() => {
+                          window.history.pushState(null, '', '/');
+                          window.location.hash = 'discovery';
+                          setCurrentTab('discovery');
+                          setIsAuthModalOpen(true);
+                          setAuthTab('login');
+                      }}
+                  />
+              </Suspense>
+              <AuthModal 
+                  isOpen={isAuthModalOpen} 
+                  onClose={() => setIsAuthModalOpen(false)} 
+                  defaultTab={authTab}
+              />
+              <Toaster position="top-center" />
+          </>
+      );
+  }
+
   // Redirect Logic for Shop Owner and Admin
   if (isAuthenticated && currentUser?.role === 'SHOP_OWNER') {
       return <OwnerRoute />;
@@ -72,7 +116,9 @@ function App() {
   if (isAuthenticated && currentUser?.role === 'ADMIN') {
       return (
           <>
-              <AdminDashboardPage />
+              <Suspense fallback={<PageLoader />}>
+                  <AdminDashboardPage />
+              </Suspense>
               <Toaster position="top-center" />
           </>
       );
@@ -142,7 +188,13 @@ function App() {
       </div>
       
       <div className="pt-[72px] flex-grow">
-          {currentTab === 'discovery' ? <ShopDiscoveryPage /> : <MyOrdersPage />}
+          {currentTab === 'discovery' ? (
+              <ShopDiscoveryPage />
+          ) : (
+              <Suspense fallback={<PageLoader />}>
+                  <MyOrdersPage />
+              </Suspense>
+          )}
       </div>
 
       <Footer />

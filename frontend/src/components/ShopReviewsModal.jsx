@@ -80,10 +80,10 @@ const ShopReviewsModal = ({ shop, isOpen, onClose }) => {
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-sm">
-                                                {review.customerName.charAt(0).toUpperCase()}
+                                                {(review.customerName || 'K').charAt(0).toUpperCase()}
                                             </div>
                                             <div>
-                                                <h4 className="font-semibold text-slate-800 text-sm">{review.customerName}</h4>
+                                                <h4 className="font-semibold text-slate-800 text-sm">{review.customerName || 'Khách hàng'}</h4>
                                                 <span className="text-xs text-slate-500">
                                                     {format(new Date(review.createdAt), 'HH:mm dd/MM/yyyy', { locale: vi })}
                                                 </span>

@@ -38,16 +38,23 @@ public class NotificationService {
                 .build();
         notification = notificationRepository.save(notification);
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("id", notification.getId());
-        payload.put("title", notification.getTitle());
-        payload.put("message", notification.getMessage());
-        payload.put("orderId", notification.getOrderId());
-        payload.put("isRead", notification.isRead());
-        payload.put("timestamp", System.currentTimeMillis());
+        // Gửi đúng DTO giống REST API (có trường read, createdAt)
+        messagingTemplate.convertAndSend("/topic/user/" + userId + "/notifications", mapToDTO(notification));
+    }
 
-        // Gửi tới đường dẫn: /topic/user/{userId}/notifications
-        messagingTemplate.convertAndSend("/topic/user/" + userId + "/notifications", payload);
+    /**
+     * Send a general notification to a specific user
+     */
+    @Transactional
+    public void sendNotification(Long userId, String title, String message) {
+        Notification notification = Notification.builder()
+                .userId(userId)
+                .title(title)
+                .message(message)
+                .build();
+        notification = notificationRepository.save(notification);
+
+        messagingTemplate.convertAndSend("/topic/user/" + userId + "/notifications", mapToDTO(notification));
     }
     
     /**
@@ -63,16 +70,8 @@ public class NotificationService {
                 .build();
         notification = notificationRepository.save(notification);
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("id", notification.getId());
-        payload.put("title", notification.getTitle());
-        payload.put("message", notification.getMessage());
-        payload.put("orderId", notification.getOrderId());
-        payload.put("isRead", notification.isRead());
-        payload.put("timestamp", System.currentTimeMillis());
-
         // Gửi tới đường dẫn riêng của chủ tiệm nhận đơn
-        messagingTemplate.convertAndSend("/topic/user/" + ownerId + "/notifications", payload);
+        messagingTemplate.convertAndSend("/topic/user/" + ownerId + "/notifications", mapToDTO(notification));
     }
 
     public Page<NotificationDTO> getUserNotifications(Long userId, Pageable pageable) {
@@ -96,10 +95,7 @@ public class NotificationService {
 
     @Transactional
     public void markAllAsRead(Long userId) {
-        List<Notification> unreadList = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .stream().filter(n -> !n.isRead()).collect(Collectors.toList());
-        unreadList.forEach(n -> n.setRead(true));
-        notificationRepository.saveAll(unreadList);
+        notificationRepository.markAllAsReadByUserId(userId);
     }
 
     private NotificationDTO mapToDTO(Notification notification) {

@@ -15,11 +15,17 @@ const AdminDashboardPage = () => {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [unreadSupportCount, setUnreadSupportCount] = useState(0);
+    const [pendingShopsCount, setPendingShopsCount] = useState(0);
+    const [shopStatusFilter, setShopStatusFilter] = useState('ALL'); // ALL, PENDING_APPROVAL, APPROVED, REJECTED
+    const [selectedShopDetail, setSelectedShopDetail] = useState(null);
+    const [rejectModalShop, setRejectModalShop] = useState(null);
+    const [rejectReason, setRejectReason] = useState('');
+    const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
 
     useEffect(() => {
         setSearchQuery('');
         fetchData();
-    }, [activeTab]);
+    }, [activeTab, shopStatusFilter]);
 
     useEffect(() => {
         axiosClient.get('/support/admin/unread-count')
@@ -27,7 +33,19 @@ const AdminDashboardPage = () => {
                 if (res?.success) setUnreadSupportCount(res.data);
             })
             .catch(() => {});
+        fetchPendingShopsCount();
     }, []);
+
+    const fetchPendingShopsCount = async () => {
+        try {
+            const res = await axiosClient.get('/admin/shops/pending-count');
+            if (res && res.pendingCount !== undefined) {
+                setPendingShopsCount(res.pendingCount);
+            }
+        } catch {
+            // Silently ignore
+        }
+    };
 
     const extractList = (res) => {
         if (!res) return [];
@@ -49,8 +67,12 @@ const AdminDashboardPage = () => {
                 const res = await axiosClient.get('/admin/users?size=100');
                 setUsers(extractList(res));
             } else if (activeTab === 'shops') {
-                const res = await axiosClient.get('/admin/shops?size=100');
+                const url = shopStatusFilter !== 'ALL'
+                    ? `/admin/shops?size=100&approvalStatus=${shopStatusFilter}`
+                    : '/admin/shops?size=100';
+                const res = await axiosClient.get(url);
                 setShops(extractList(res));
+                fetchPendingShopsCount();
             } else if (activeTab === 'disputes' || activeTab === 'payouts' || activeTab === 'support') {
                 // Component fetches its own data
                 setLoading(false);
@@ -69,6 +91,7 @@ const AdminDashboardPage = () => {
         return (
             (u.fullName && u.fullName.toLowerCase().includes(q)) ||
             (u.phone && u.phone.includes(q)) ||
+            (u.email && u.email.toLowerCase().includes(q)) ||
             (u.role && u.role.toLowerCase().includes(q)) ||
             String(u.id).includes(q)
         );
@@ -80,6 +103,8 @@ const AdminDashboardPage = () => {
         return (
             (s.name && s.name.toLowerCase().includes(q)) ||
             (s.ownerName && s.ownerName.toLowerCase().includes(q)) ||
+            (s.ownerPhone && s.ownerPhone.includes(q)) ||
+            (s.phone && s.phone.includes(q)) ||
             (s.address && s.address.toLowerCase().includes(q)) ||
             String(s.id).includes(q)
         );
@@ -87,7 +112,8 @@ const AdminDashboardPage = () => {
 
     const toggleUserStatus = async (id) => {
         try {
-            await axiosClient.put(`/admin/users/${id}/toggle-status`);
+            const res = await axiosClient.put(`/admin/users/${id}/toggle-status`);
+            toast.success(res?.message || "Cập nhật trạng thái thành công");
             fetchData();
         } catch (error) {
             toast.error(error.response?.data?.message || "Lỗi cập nhật");
@@ -96,10 +122,55 @@ const AdminDashboardPage = () => {
 
     const toggleShopStatus = async (id) => {
         try {
-            await axiosClient.put(`/admin/shops/${id}/toggle-status`);
+            const res = await axiosClient.put(`/admin/shops/${id}/toggle-status`);
+            toast.success(res?.message || "Cập nhật trạng thái thành công");
             fetchData();
         } catch (error) {
             toast.error(error.response?.data?.message || "Lỗi cập nhật");
+        }
+    };
+
+    const handleApproveShop = async (shopId) => {
+        if (!window.confirm("Bạn có chắc chắn muốn phê duyệt tiệm này để lên sàn hoạt động không?")) return;
+        setIsSubmittingApproval(true);
+        try {
+            const res = await axiosClient.put(`/admin/shops/${shopId}/approve`);
+            toast.success(res?.message || "Phê duyệt tiệm thành công!");
+            if (selectedShopDetail && selectedShopDetail.id === shopId) {
+                setSelectedShopDetail(null);
+            }
+            fetchData();
+            fetchPendingShopsCount();
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Lỗi phê duyệt tiệm");
+        } finally {
+            setIsSubmittingApproval(false);
+        }
+    };
+
+    const handleRejectShop = async () => {
+        if (!rejectModalShop) return;
+        if (!rejectReason.trim()) {
+            toast.error("Vui lòng nhập lý do từ chối để chủ tiệm khắc phục!");
+            return;
+        }
+        setIsSubmittingApproval(true);
+        try {
+            const res = await axiosClient.put(`/admin/shops/${rejectModalShop.id}/reject`, {
+                reason: rejectReason.trim()
+            });
+            toast.success(res?.message || "Đã từ chối duyệt tiệm!");
+            setRejectModalShop(null);
+            setRejectReason('');
+            if (selectedShopDetail && selectedShopDetail.id === rejectModalShop.id) {
+                setSelectedShopDetail(null);
+            }
+            fetchData();
+            fetchPendingShopsCount();
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Lỗi khi từ chối tiệm");
+        } finally {
+            setIsSubmittingApproval(false);
         }
     };
 
@@ -132,10 +203,17 @@ const AdminDashboardPage = () => {
                     </button>
                     <button 
                         onClick={() => setActiveTab('shops')}
-                        className={`w-full text-left px-4 py-3 rounded-xl transition-all font-medium flex items-center gap-3 ${activeTab === 'shops' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'hover:bg-slate-800 hover:text-white'}`}
+                        className={`w-full text-left px-4 py-3 rounded-xl transition-all font-medium flex items-center justify-between ${activeTab === 'shops' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'hover:bg-slate-800 hover:text-white'}`}
                     >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                        Tiệm giặt
+                        <div className="flex items-center gap-3">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                            <span>Tiệm giặt</span>
+                        </div>
+                        {pendingShopsCount > 0 && (
+                            <span className="bg-amber-400 text-slate-900 text-[11px] font-black px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                                {pendingShopsCount} chờ
+                            </span>
+                        )}
                     </button>
                     <button 
                         onClick={() => setActiveTab('payouts')}
@@ -272,32 +350,90 @@ const AdminDashboardPage = () => {
                     ) : (
                         <div className="space-y-4">
                             {/* Search and Filter toolbar */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                <div className="relative w-full sm:w-80">
-                                    <input 
-                                        type="text"
-                                        placeholder={activeTab === 'users' ? "Tìm theo tên, SĐT, vai trò..." : "Tìm theo tên tiệm, chủ tiệm, địa chỉ..."}
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                                    />
-                                    <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                                    <div className="relative w-full sm:w-80">
+                                        <input 
+                                            type="text"
+                                            placeholder={activeTab === 'users' ? "Tìm theo tên, email, SĐT, vai trò..." : "Tìm theo tên tiệm, chủ tiệm, SĐT, địa chỉ..."}
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                                        />
+                                        <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                    </div>
+
+                                    {activeTab === 'shops' && (
+                                        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto">
+                                            <button
+                                                onClick={() => setShopStatusFilter('ALL')}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                                                    shopStatusFilter === 'ALL'
+                                                        ? 'bg-white text-slate-900 shadow-sm'
+                                                        : 'text-slate-600 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                Tất cả
+                                            </button>
+                                            <button
+                                                onClick={() => setShopStatusFilter('PENDING_APPROVAL')}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                                                    shopStatusFilter === 'PENDING_APPROVAL'
+                                                        ? 'bg-amber-500 text-white shadow-sm'
+                                                        : 'text-amber-700 hover:bg-amber-100/60'
+                                                }`}
+                                            >
+                                                <span>Chờ duyệt</span>
+                                                {pendingShopsCount > 0 && (
+                                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                                        shopStatusFilter === 'PENDING_APPROVAL'
+                                                            ? 'bg-amber-700 text-white'
+                                                            : 'bg-amber-200 text-amber-900'
+                                                    }`}>
+                                                        {pendingShopsCount}
+                                                    </span>
+                                                )}
+                                            </button>
+                                            <button
+                                                onClick={() => setShopStatusFilter('APPROVED')}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                                                    shopStatusFilter === 'APPROVED'
+                                                        ? 'bg-emerald-600 text-white shadow-sm'
+                                                        : 'text-slate-600 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                Đã duyệt
+                                            </button>
+                                            <button
+                                                onClick={() => setShopStatusFilter('REJECTED')}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                                                    shopStatusFilter === 'REJECTED'
+                                                        ? 'bg-rose-600 text-white shadow-sm'
+                                                        : 'text-slate-600 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                Từ chối
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                                <span className="text-xs text-slate-500 font-medium">
-                                    Hiển thị {activeTab === 'users' ? filteredUsers.length : filteredShops.length} mục
+
+                                <span className="text-xs text-slate-500 font-medium whitespace-nowrap self-end lg:self-center">
+                                    Hiển thị {activeTab === 'users' ? filteredUsers.length : filteredShops.length} kết quả
                                 </span>
                             </div>
 
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                <table className="w-full text-left border-collapse min-w-[800px]">
+                                <table className="w-full text-left border-collapse min-w-[900px]">
                                     <thead>
                                         <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
                                             {activeTab === 'users' ? (
                                                 <>
                                                     <th className="p-4 pl-6">ID</th>
-                                                    <th className="p-4">Họ tên</th>
+                                                    <th className="p-4">Người dùng</th>
+                                                    <th className="p-4">Email</th>
                                                     <th className="p-4">SĐT</th>
                                                     <th className="p-4">Vai trò</th>
                                                     <th className="p-4">Ngày đăng ký</th>
@@ -307,11 +443,12 @@ const AdminDashboardPage = () => {
                                             ) : (
                                                 <>
                                                     <th className="p-4 pl-6">ID</th>
-                                                    <th className="p-4">Tên Tiệm</th>
-                                                    <th className="p-4">Chủ Tiệm</th>
-                                                    <th className="p-4">Địa chỉ</th>
-                                                    <th className="p-4 text-center">Đánh giá</th>
-                                                    <th className="p-4 text-center">Trạng thái</th>
+                                                    <th className="p-4">Tiệm giặt</th>
+                                                    <th className="p-4">Chủ tiệm</th>
+                                                    <th className="p-4">Địa chỉ & Giờ mở</th>
+                                                    <th className="p-4 text-center">Thiết bị</th>
+                                                    <th className="p-4 text-center">Kiểm duyệt</th>
+                                                    <th className="p-4 text-center">Hoạt động</th>
                                                     <th className="p-4 text-right pr-6">Hành động</th>
                                                 </>
                                             )}
@@ -321,7 +458,7 @@ const AdminDashboardPage = () => {
                                         {activeTab === 'users' ? (
                                             filteredUsers.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan="7" className="p-12 text-center text-slate-400 text-sm">
+                                                    <td colSpan="8" className="p-12 text-center text-slate-400 text-sm">
                                                         {users.length === 0 ? "Không có dữ liệu người dùng." : "Không tìm thấy người dùng phù hợp với từ khóa tìm kiếm."}
                                                     </td>
                                                 </tr>
@@ -329,11 +466,27 @@ const AdminDashboardPage = () => {
                                                 filteredUsers.map(u => (
                                                     <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
                                                         <td className="p-4 pl-6 font-medium text-slate-900">#{u.id}</td>
-                                                        <td className="p-4 font-medium text-slate-800">{u.fullName}</td>
-                                                        <td className="p-4 text-slate-500">{u.phone}</td>
                                                         <td className="p-4">
-                                                            <span className={`px-2 py-1 rounded text-[10px] font-bold ${u.role === 'SHOP_OWNER' ? 'bg-amber-100 text-amber-800' : (u.role === 'ADMIN' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800')}`}>
-                                                                {u.role}
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs uppercase overflow-hidden shrink-0">
+                                                                    {u.avatarUrl ? (
+                                                                        <img src={u.avatarUrl} alt="" className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        (u.fullName || 'U').charAt(0)
+                                                                    )}
+                                                                </div>
+                                                                <span className="font-semibold text-slate-800">{u.fullName || 'Chưa đặt tên'}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-4 text-slate-500 text-xs">{u.email || '-'}</td>
+                                                        <td className="p-4 text-slate-600 font-mono text-xs">{u.phone}</td>
+                                                        <td className="p-4">
+                                                            <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold ${
+                                                                u.role === 'SHOP_OWNER' 
+                                                                    ? 'bg-amber-100 text-amber-800' 
+                                                                    : (u.role === 'ADMIN' ? 'bg-rose-100 text-rose-800' : 'bg-indigo-100 text-indigo-800')
+                                                            }`}>
+                                                                {u.role === 'SHOP_OWNER' ? 'CHỦ TIỆM' : (u.role === 'ADMIN' ? 'ADMIN' : 'KHÁCH HÀNG')}
                                                             </span>
                                                         </td>
                                                         <td className="p-4 text-slate-500 text-xs">{formatDateTime(u.createdAt)}</td>
@@ -354,9 +507,13 @@ const AdminDashboardPage = () => {
                                                             {u.role !== 'ADMIN' && (
                                                                 <button 
                                                                     onClick={() => toggleUserStatus(u.id)}
-                                                                    className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${u.isActive ? 'text-rose-600 bg-rose-50 hover:bg-rose-100' : 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'}`}
+                                                                    className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
+                                                                        u.isActive 
+                                                                            ? 'text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200' 
+                                                                            : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                                                                    }`}
                                                                 >
-                                                                    {u.isActive ? 'Khóa' : 'Mở khóa'}
+                                                                    {u.isActive ? 'Khóa tài khoản' : 'Mở khóa'}
                                                                 </button>
                                                             )}
                                                         </td>
@@ -366,46 +523,132 @@ const AdminDashboardPage = () => {
                                         ) : (
                                             filteredShops.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan="7" className="p-12 text-center text-slate-400 text-sm">
-                                                        {shops.length === 0 ? "Không có dữ liệu tiệm giặt." : "Không tìm thấy tiệm giặt phù hợp với từ khóa tìm kiếm."}
+                                                    <td colSpan="8" className="p-12 text-center text-slate-400 text-sm">
+                                                        {shops.length === 0 ? "Không có dữ liệu tiệm giặt trong mục này." : "Không tìm thấy tiệm giặt phù hợp với từ khóa tìm kiếm."}
                                                     </td>
                                                 </tr>
                                             ) : (
                                                 filteredShops.map(s => (
                                                     <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
                                                         <td className="p-4 pl-6 font-medium text-slate-900">#{s.id}</td>
-                                                        <td className="p-4 font-semibold text-indigo-700">{s.name}</td>
-                                                        <td className="p-4">{s.ownerName}</td>
-                                                        <td className="p-4 text-slate-500 text-xs truncate max-w-[200px]" title={s.address}>{s.address}</td>
+                                                        <td className="p-4">
+                                                            <div className="flex items-center gap-3">
+                                                                {s.coverImage ? (
+                                                                    <img 
+                                                                        src={s.coverImage} 
+                                                                        alt="" 
+                                                                        className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" 
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+                                                                        TIỆM
+                                                                    </div>
+                                                                )}
+                                                                <div>
+                                                                    <p className="font-bold text-slate-900 hover:text-indigo-600 cursor-pointer" onClick={() => setSelectedShopDetail(s)}>
+                                                                        {s.name}
+                                                                    </p>
+                                                                    <p className="text-xs text-slate-400 font-mono">{s.phone || 'Chưa có SĐT'}</p>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-4">
+                                                            <p className="font-medium text-slate-800">{s.ownerName || 'Chưa cập nhật'}</p>
+                                                            <p className="text-xs text-slate-500 font-mono">{s.ownerPhone || '-'}</p>
+                                                        </td>
+                                                        <td className="p-4 text-xs text-slate-600 max-w-[220px]">
+                                                            <p className="truncate font-medium text-slate-700" title={s.address}>{s.address || 'Chưa có địa chỉ'}</p>
+                                                            <p className="text-slate-400 mt-0.5">{s.operatingHours || '07:00 - 22:00'}</p>
+                                                        </td>
                                                         <td className="p-4 text-center text-xs">
-                                                            {s.rating > 0 ? (
-                                                                <span className="flex items-center justify-center gap-1">
-                                                                    <svg className="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                                                                    <span className="font-bold">{s.rating}</span>
-                                                                    <span className="text-slate-400">({s.reviewCount})</span>
+                                                            <div className="inline-flex flex-col gap-0.5 text-[11px] text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
+                                                                <span>{s.totalWashers || 0} Giặt</span>
+                                                                <span>{s.totalDryers || 0} Sấy</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-4 text-center">
+                                                            {s.approvalStatus === 'PENDING_APPROVAL' ? (
+                                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                                                                    Chờ duyệt
                                                                 </span>
-                                                            ) : '-'}
+                                                            ) : s.approvalStatus === 'APPROVED' ? (
+                                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                                                                    <svg className="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                                                    Đã duyệt
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200" title={s.rejectionReason}>
+                                                                    <svg className="w-3 h-3 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                                    Từ chối
+                                                                </span>
+                                                            )}
                                                         </td>
                                                         <td className="p-4 text-center">
                                                             {s.isActive ? (
-                                                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                                                    Hoạt động
+                                                                <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                                                    Bật
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                                                    Chờ duyệt / Khóa
+                                                                <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                                                    Tắt
                                                                 </span>
                                                             )}
                                                         </td>
                                                         <td className="p-4 pr-6 text-right">
-                                                            <button 
-                                                                onClick={() => toggleShopStatus(s.id)}
-                                                                className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${s.isActive ? 'text-rose-600 bg-rose-50 hover:bg-rose-100' : 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'}`}
-                                                            >
-                                                                {s.isActive ? 'Đình chỉ' : 'Phê duyệt'}
-                                                            </button>
+                                                            <div className="flex items-center justify-end gap-1.5">
+                                                                <button 
+                                                                    onClick={() => setSelectedShopDetail(s)}
+                                                                    className="text-xs font-semibold px-2.5 py-1 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                                                >
+                                                                    Chi tiết
+                                                                </button>
+
+                                                                {s.approvalStatus === 'PENDING_APPROVAL' && (
+                                                                    <>
+                                                                        <button 
+                                                                            disabled={isSubmittingApproval}
+                                                                            onClick={() => handleApproveShop(s.id)}
+                                                                            className="text-xs font-semibold px-2.5 py-1 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 transition-all shadow-sm"
+                                                                        >
+                                                                            Duyệt
+                                                                        </button>
+                                                                        <button 
+                                                                            disabled={isSubmittingApproval}
+                                                                            onClick={() => {
+                                                                                setRejectModalShop(s);
+                                                                                setRejectReason('');
+                                                                            }}
+                                                                            className="text-xs font-semibold px-2.5 py-1 rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all"
+                                                                        >
+                                                                            Từ chối
+                                                                        </button>
+                                                                    </>
+                                                                )}
+
+                                                                {s.approvalStatus === 'APPROVED' && (
+                                                                    <button 
+                                                                        onClick={() => toggleShopStatus(s.id)}
+                                                                        className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors ${
+                                                                            s.isActive 
+                                                                                ? 'text-slate-600 hover:bg-slate-100' 
+                                                                                : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                                                                        }`}
+                                                                    >
+                                                                        {s.isActive ? 'Khóa tiệm' : 'Mở lại'}
+                                                                    </button>
+                                                                )}
+
+                                                                {s.approvalStatus === 'REJECTED' && (
+                                                                    <button 
+                                                                        disabled={isSubmittingApproval}
+                                                                        onClick={() => handleApproveShop(s.id)}
+                                                                        className="text-xs font-semibold px-2.5 py-1 rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all"
+                                                                    >
+                                                                        Duyệt lại
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))
@@ -418,6 +661,167 @@ const AdminDashboardPage = () => {
                     )}
                 </div>
             </div>
+
+            {/* Modal: Chi tiết tiệm giặt */}
+            {selectedShopDetail && (
+                <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="relative h-48 bg-slate-100">
+                            {selectedShopDetail.coverImage ? (
+                                <img src={selectedShopDetail.coverImage} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold">
+                                    Không có ảnh bìa
+                                </div>
+                            )}
+                            <button 
+                                onClick={() => setSelectedShopDetail(null)}
+                                className="absolute top-4 right-4 w-9 h-9 bg-slate-900/60 hover:bg-slate-900 text-white rounded-full flex items-center justify-center backdrop-blur-md transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4 max-h-[calc(85vh-12rem)] overflow-y-auto">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-900">{selectedShopDetail.name}</h3>
+                                    <p className="text-sm text-slate-500 mt-0.5">{selectedShopDetail.address}</p>
+                                </div>
+                                <div>
+                                    {selectedShopDetail.approvalStatus === 'PENDING_APPROVAL' ? (
+                                        <span className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                                            Chờ phê duyệt
+                                        </span>
+                                    ) : selectedShopDetail.approvalStatus === 'APPROVED' ? (
+                                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                                            Đã duyệt
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs font-bold text-rose-700 bg-rose-50 px-3 py-1 rounded-full border border-rose-200">
+                                            Bị từ chối
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {selectedShopDetail.rejectionReason && (
+                                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs">
+                                    <p className="font-bold">Lý do từ chối trước đó:</p>
+                                    <p className="mt-0.5">{selectedShopDetail.rejectionReason}</p>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4 text-xs">
+                                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                                    <p className="text-slate-400 font-medium">Chủ sở hữu</p>
+                                    <p className="text-sm font-bold text-slate-800 mt-1">{selectedShopDetail.ownerName || 'Chưa cập nhật'}</p>
+                                    <p className="text-slate-500 font-mono mt-0.5">SĐT: {selectedShopDetail.ownerPhone || '-'}</p>
+                                </div>
+                                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                                    <p className="text-slate-400 font-medium">Hotline tiệm</p>
+                                    <p className="text-sm font-bold text-slate-800 mt-1 font-mono">{selectedShopDetail.phone || 'Chưa có'}</p>
+                                    <p className="text-slate-500 mt-0.5">Giờ: {selectedShopDetail.operatingHours || '07:00 - 22:00'}</p>
+                                </div>
+                                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                                    <p className="text-slate-400 font-medium">Cơ sở vật chất</p>
+                                    <p className="text-sm font-bold text-slate-800 mt-1">{selectedShopDetail.totalWashers || 0} máy giặt, {selectedShopDetail.totalDryers || 0} máy sấy</p>
+                                </div>
+                                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                                    <p className="text-slate-400 font-medium">Ngày đăng ký</p>
+                                    <p className="text-sm font-bold text-slate-800 mt-1">{formatDateTime(selectedShopDetail.createdAt) || 'Mới đây'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+                            <button 
+                                onClick={() => setSelectedShopDetail(null)}
+                                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200 transition-colors"
+                            >
+                                Đóng
+                            </button>
+                            {selectedShopDetail.approvalStatus === 'PENDING_APPROVAL' && (
+                                <>
+                                    <button 
+                                        disabled={isSubmittingApproval}
+                                        onClick={() => {
+                                            const s = selectedShopDetail;
+                                            setSelectedShopDetail(null);
+                                            setRejectModalShop(s);
+                                            setRejectReason('');
+                                        }}
+                                        className="px-4 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors"
+                                    >
+                                        Từ chối tiệm
+                                    </button>
+                                    <button 
+                                        disabled={isSubmittingApproval}
+                                        onClick={() => handleApproveShop(selectedShopDetail.id)}
+                                        className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm"
+                                    >
+                                        Phê duyệt lên sàn
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Lý do từ chối tiệm */}
+            {rejectModalShop && (
+                <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl p-6 border border-slate-100 animate-in fade-in zoom-in-95 duration-150 space-y-4">
+                        <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-900">Từ chối duyệt tiệm</h4>
+                                    <p className="text-xs text-slate-500">{rejectModalShop.name}</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setRejectModalShop(null)}
+                                className="text-slate-400 hover:text-slate-600"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                                Lý do từ chối (Chủ tiệm sẽ nhận được thông báo này):
+                            </label>
+                            <textarea 
+                                rows={4}
+                                value={rejectReason}
+                                onChange={(e) => setRejectReason(e.target.value)}
+                                placeholder="Ví dụ: Hình ảnh biển hiệu hoặc cơ sở tiệm chưa rõ ràng; Địa chỉ chưa chính xác; Thiếu số điện thoại liên hệ..."
+                                className="w-full p-3 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-rose-500 focus:border-rose-500 focus:outline-none"
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2.5 pt-2">
+                            <button 
+                                onClick={() => setRejectModalShop(null)}
+                                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button 
+                                disabled={isSubmittingApproval || !rejectReason.trim()}
+                                onClick={handleRejectShop}
+                                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 transition-colors shadow-sm"
+                            >
+                                Xác nhận từ chối
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

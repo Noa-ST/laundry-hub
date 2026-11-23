@@ -126,8 +126,21 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
         BigDecimal serviceFee = BigDecimal.ZERO;
 
         for (PosOrderItemRequestDTO itemDto : request.items()) {
+            if (itemDto.quantity() == null || itemDto.quantity() <= 0) {
+                throw new IllegalArgumentException("Số lượng dịch vụ phải lớn hơn 0.");
+            }
+            if (itemDto.unitPrice() == null || itemDto.unitPrice() < 0) {
+                throw new IllegalArgumentException("Đơn giá dịch vụ không hợp lệ.");
+            }
             LaundryService service = laundryServiceRepository.findById(itemDto.serviceId())
                     .orElseThrow(() -> new IllegalArgumentException("Dịch vụ không hợp lệ: " + itemDto.serviceId()));
+
+            if (!service.getShop().getId().equals(shop.getId())) {
+                throw new IllegalArgumentException("Dịch vụ không thuộc tiệm của bạn.");
+            }
+            if (!Boolean.TRUE.equals(service.getIsActive())) {
+                throw new IllegalArgumentException("Dịch vụ '" + service.getName() + "' hiện đã ngừng cung cấp.");
+            }
                     
             BigDecimal unitPrice = BigDecimal.valueOf(itemDto.unitPrice());
             BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(itemDto.quantity()));
@@ -136,7 +149,6 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
                 BigDecimal minCharge = BigDecimal.valueOf(service.getMinCharge());
                 if (itemTotal.compareTo(minCharge) < 0) {
                     itemTotal = minCharge;
-                    unitPrice = minCharge.divide(BigDecimal.valueOf(itemDto.quantity()), 2, java.math.RoundingMode.HALF_UP);
                 }
             }
 
@@ -156,8 +168,18 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
         if (request.voucherCode() != null && !request.voucherCode().trim().isEmpty()) {
             Voucher voucher = voucherRepository.findByShopIdAndCode(shop.getId(), request.voucherCode().trim().toUpperCase())
                     .orElseThrow(() -> new IllegalArgumentException("Mã giảm giá không hợp lệ"));
+            if (voucher.getTargetUser() != null && (customer == null || !voucher.getTargetUser().getId().equals(customer.getId()))) {
+                throw new IllegalArgumentException("Mã giảm giá này dành riêng cho khách hàng khác.");
+            }
             if (!voucher.isValidForOrder(serviceFee.doubleValue())) {
                 throw new IllegalArgumentException("Mã giảm giá không đủ điều kiện áp dụng");
+            }
+            if (voucher.getUsageLimitPerUser() != null && customer != null) {
+                long userUsageCount = orderRepository.countByCustomerIdAndVoucherIdAndStatusNot(
+                        customer.getId(), voucher.getId(), OrderStatus.CANCELLED);
+                if (userUsageCount >= voucher.getUsageLimitPerUser()) {
+                    throw new IllegalArgumentException("Khách hàng đã sử dụng mã giảm giá này tối đa số lần cho phép.");
+                }
             }
             Double discount = voucher.calculateDiscount(serviceFee.doubleValue());
             discountAmount = BigDecimal.valueOf(discount);
@@ -186,9 +208,17 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
     @Transactional
     public OrderResponseDTO updateOrderStatus(Long ownerId, Long orderId, UpdateOrderStatusRequestDTO request) {
         Order order = getOrderAndValidateOwner(ownerId, orderId);
+        OrderStatus previousStatus = order.getStatus();
+
+        if (request.newStatus() == OrderStatus.CANCELLED && order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new BadRequestException("Không thể hủy đơn hàng đã được thanh toán. Vui lòng liên hệ hỗ trợ để xử lý hoàn tiền.");
+        }
+
         orderStateMachineService.transitionTo(order, request.newStatus(), request.cancelReason(), "SHOP_OWNER");
 
-        if (request.newStatus() == OrderStatus.CANCELLED && order.getVoucher() != null) {
+        if (previousStatus != OrderStatus.CANCELLED
+                && request.newStatus() == OrderStatus.CANCELLED
+                && order.getVoucher() != null) {
             Voucher voucher = order.getVoucher();
             if (voucher.getUsedCount() != null && voucher.getUsedCount() > 0) {
                 voucher.setUsedCount(voucher.getUsedCount() - 1);
@@ -235,6 +265,10 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
     public OrderResponseDTO inspectOrder(Long ownerId, Long orderId, InspectOrderRequestDTO request) {
         Order order = getOrderAndValidateOwner(ownerId, orderId);
         
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new BadRequestException("Đơn hàng đã thanh toán, không thể chỉnh sửa cân nặng/giá tiền.");
+        }
+
         if (order.getStatus() == OrderStatus.PROCESSING ||
             order.getStatus() == OrderStatus.READY ||
             order.getStatus() == OrderStatus.DELIVERING ||
@@ -282,9 +316,9 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
         
         BigDecimal discountAmount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
         if (order.getVoucher() != null) {
-            // Recalculate discount based on new service fee + shipping fee (preDiscountTotal)
+            // Recalculate discount based on new service fee + shipping fee without failing on usedCount/endDate
             BigDecimal preDiscountTotal = newServiceFee.add(order.getShippingFee() != null ? order.getShippingFee() : BigDecimal.ZERO);
-            Double discount = order.getVoucher().calculateDiscount(preDiscountTotal.doubleValue());
+            Double discount = order.getVoucher().calculateDiscountForExistingOrder(preDiscountTotal.doubleValue());
             discountAmount = BigDecimal.valueOf(discount);
             order.setDiscountAmount(discountAmount);
         }
@@ -306,6 +340,10 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
     @Transactional
     public OrderResponseDTO updateOrderItems(Long ownerId, Long orderId, UpdateOrderItemsRequestDTO request) {
         Order order = getOrderAndValidateOwner(ownerId, orderId);
+
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new BadRequestException("Đơn hàng đã thanh toán, không thể chỉnh sửa số lượng/giá tiền.");
+        }
 
         if (order.getStatus() == OrderStatus.PROCESSING ||
             order.getStatus() == OrderStatus.READY ||
@@ -344,7 +382,7 @@ public class OwnerOrderServiceImpl implements OwnerOrderService {
         BigDecimal discountAmount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
         if (order.getVoucher() != null) {
             BigDecimal preDiscountTotal = newServiceFee.add(order.getShippingFee() != null ? order.getShippingFee() : BigDecimal.ZERO);
-            Double discount = order.getVoucher().calculateDiscount(preDiscountTotal.doubleValue());
+            Double discount = order.getVoucher().calculateDiscountForExistingOrder(preDiscountTotal.doubleValue());
             discountAmount = BigDecimal.valueOf(discount);
             order.setDiscountAmount(discountAmount);
         }

@@ -143,7 +143,7 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }) => {
                 <div className="overflow-y-auto flex-1 p-4 bg-slate-50/50">
                     {isAdding ? (
                         <form onSubmit={handleSaveAddress} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-                            <h3 className="font-bold text-sm text-slate-800">Thêm địa chỉ mới</h3>
+                            <h3 className="font-bold text-sm text-slate-800">{editId ? 'Cập nhật địa chỉ' : 'Thêm địa chỉ mới'}</h3>
                             <div>
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Tên lưu nhớ (Label)</label>
                                 <select value={label} onChange={e=>setLabel(e.target.value)} className="w-full border-slate-200 rounded-lg text-sm p-2 bg-slate-50 outline-none focus:border-teal-500">
@@ -163,7 +163,7 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }) => {
                                 }}
                             />
                             <div className="flex gap-2 pt-2 border-t border-slate-100">
-                                <button type="button" onClick={()=>{setIsAdding(false); setEditId(null);}} className="flex-1 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Hủy</button>
+                                <button type="button" onClick={()=>{setIsAdding(false); setEditId(null); setLabel('Nhà riêng'); setAddressText(''); setLat(''); setLng('');}} className="flex-1 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Hủy</button>
                                 <button type="submit" className="flex-1 py-2 text-xs font-semibold bg-teal-600 text-white rounded-lg hover:bg-teal-700">{editId ? 'Cập Nhật' : 'Lưu Địa Chỉ'}</button>
                             </div>
                         </form>

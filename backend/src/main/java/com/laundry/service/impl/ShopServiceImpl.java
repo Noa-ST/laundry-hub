@@ -38,7 +38,7 @@ public class ShopServiceImpl implements ShopService {
 
     @Override
     public List<ShopResponseDTO> findNearbyShops(Double lat, Double lng, Double radius) {
-        List<Shop> allShops = shopRepository.findByIsActiveTrue();
+        List<Shop> allShops = shopRepository.findByIsActiveTrueAndApprovalStatus(com.laundry.enums.ShopApprovalStatus.APPROVED);
         
         record ShopWithDistance(Shop shop, Double distance) {}
         
@@ -60,7 +60,7 @@ public class ShopServiceImpl implements ShopService {
             return List.of();
         }
 
-        List<LaundryService> services = laundryServiceRepository.findByShopIdIn(shopIds);
+        List<LaundryService> services = laundryServiceRepository.findByShopIdInAndIsActiveTrue(shopIds);
         Map<Long, List<ServiceDTO>> servicesByShop = services.stream()
                 .collect(Collectors.groupingBy(
                         ls -> ls.getShop().getId(),
@@ -122,7 +122,9 @@ public class ShopServiceImpl implements ShopService {
                             shop.getBaseShippingFee(),
                             shop.getExtraShippingFeePerKm(),
                             shop.getMaxDeliveryDistance(),
-                            serviceDTOs
+                            serviceDTOs,
+                            shop.getApprovalStatus() != null ? shop.getApprovalStatus().name() : "APPROVED",
+                            shop.getRejectionReason()
                     );
                 })
                 .orElse(null);
@@ -132,11 +134,11 @@ public class ShopServiceImpl implements ShopService {
     @Transactional
     public ShopResponseDTO setupShop(Long ownerId, SetupShopRequestDTO request) {
         if (shopRepository.existsByOwnerId(ownerId)) {
-            throw new IllegalArgumentException("Báº¡n Ä‘Ã£ sá»Ÿ há»¯u má»™t tiá»‡m giáº·t.");
+            throw new IllegalArgumentException("Bạn đã sở hữu một tiệm giặt.");
         }
 
         User owner = userRepository.findById(ownerId)
-                .orElseThrow(() -> new IllegalArgumentException("KhÃ´ng tÃ¬m tháº¥y chá»§ tiá»‡m."));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy chủ tiệm."));
 
         Shop newShop = Shop.builder()
                 .owner(owner)
@@ -153,7 +155,8 @@ public class ShopServiceImpl implements ShopService {
                 .baseShippingFee(request.baseShippingFee() != null ? request.baseShippingFee() : 15000.0)
                 .extraShippingFeePerKm(request.extraShippingFeePerKm() != null ? request.extraShippingFeePerKm() : 5000.0)
                 .maxDeliveryDistance(request.maxDeliveryDistance() != null ? request.maxDeliveryDistance() : 10.0)
-                .isActive(true)
+                .isActive(false)
+                .approvalStatus(com.laundry.enums.ShopApprovalStatus.PENDING_APPROVAL)
                 .build();
 
         Shop savedShop = shopRepository.save(newShop);
@@ -214,7 +217,9 @@ public class ShopServiceImpl implements ShopService {
                 savedShop.getBaseShippingFee(),
                 savedShop.getExtraShippingFeePerKm(),
                 savedShop.getMaxDeliveryDistance(),
-                serviceDTOs
+                serviceDTOs,
+                savedShop.getApprovalStatus() != null ? savedShop.getApprovalStatus().name() : "PENDING_APPROVAL",
+                savedShop.getRejectionReason()
         );
     }
 
@@ -222,7 +227,7 @@ public class ShopServiceImpl implements ShopService {
     @Transactional
     public ShopResponseDTO updateShop(Long ownerId, com.laundry.dto.request.UpdateShopRequestDTO request) {
         Shop shop = shopRepository.findFirstByOwnerId(ownerId)
-                .orElseThrow(() -> new IllegalArgumentException("KhÃ´ng tÃ¬m tháº¥y tiá»‡m cá»§a báº¡n."));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tiệm của bạn."));
 
         String oldCoverImage = shop.getCoverImage();
         List<String> oldGalleryImages = shop.getGalleryImages() != null ? new java.util.ArrayList<>(shop.getGalleryImages()) : new java.util.ArrayList<>();
@@ -245,6 +250,10 @@ public class ShopServiceImpl implements ShopService {
         if (request.maxDeliveryDistance() != null) shop.setMaxDeliveryDistance(request.maxDeliveryDistance());
         
         if (request.isActive() != null) {
+            if (Boolean.TRUE.equals(request.isActive())
+                    && shop.getApprovalStatus() != com.laundry.enums.ShopApprovalStatus.APPROVED) {
+                throw new IllegalArgumentException("Tiệm chưa được Admin phê duyệt nên không thể bật hoạt động.");
+            }
             shop.setIsActive(request.isActive());
         }
 
@@ -284,7 +293,53 @@ public class ShopServiceImpl implements ShopService {
                 savedShop.getBaseShippingFee(),
                 savedShop.getExtraShippingFeePerKm(),
                 savedShop.getMaxDeliveryDistance(),
-                serviceDTOs
+                serviceDTOs,
+                savedShop.getApprovalStatus() != null ? savedShop.getApprovalStatus().name() : "APPROVED",
+                savedShop.getRejectionReason()
+        );
+    }
+
+    @Override
+    @Transactional
+    public ShopResponseDTO resubmitShop(Long ownerId) {
+        Shop shop = shopRepository.findFirstByOwnerId(ownerId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy thông tin tiệm giặt."));
+
+        if (shop.getApprovalStatus() != com.laundry.enums.ShopApprovalStatus.REJECTED) {
+            throw new IllegalArgumentException("Chỉ có thể gửi duyệt lại khi tiệm đang ở trạng thái bị từ chối.");
+        }
+
+        shop.setApprovalStatus(com.laundry.enums.ShopApprovalStatus.PENDING_APPROVAL);
+        shop.setRejectionReason(null);
+        Shop savedShop = shopRepository.save(shop);
+
+        List<LaundryService> services = laundryServiceRepository.findByShopId(savedShop.getId());
+        List<ServiceDTO> serviceDTOs = services.stream()
+                .map(ls -> new ServiceDTO(ls.getId(), ls.getName(), ls.getUnit() != null ? ls.getUnit().getName() : "", ls.getPrice()))
+                .collect(Collectors.toList());
+
+        return new ShopResponseDTO(
+                savedShop.getId(),
+                savedShop.getName(),
+                savedShop.getAddress(),
+                savedShop.getLatitude(),
+                savedShop.getLongitude(),
+                0.0,
+                savedShop.getPhone(),
+                savedShop.getCoverImage(),
+                savedShop.getGalleryImages(),
+                savedShop.getOperatingHours(),
+                savedShop.getTotalWashers(),
+                savedShop.getTotalDryers(),
+                savedShop.getIsActive(),
+                savedShop.getRating(),
+                savedShop.getReviewCount(),
+                savedShop.getBaseShippingFee(),
+                savedShop.getExtraShippingFeePerKm(),
+                savedShop.getMaxDeliveryDistance(),
+                serviceDTOs,
+                savedShop.getApprovalStatus().name(),
+                savedShop.getRejectionReason()
         );
     }
 }

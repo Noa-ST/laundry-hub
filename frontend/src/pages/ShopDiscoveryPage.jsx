@@ -34,6 +34,7 @@ const ShopDiscoveryPage = () => {
         const fetchShops = async () => {
             try {
                 setLoading(true);
+                setError(null);
                 const response = await axiosClient.get(`/shops/nearby?lat=${location.lat}&lng=${location.lng}&radius=${radius}`);
                 if (response.success) {
                     setShops(response.data);
@@ -86,8 +87,10 @@ const ShopDiscoveryPage = () => {
         if (sortBy === 'rating') {
             return (b.rating || 0) - (a.rating || 0);
         } else if (sortBy === 'price') {
-            const minA = a.services?.length > 0 ? Math.min(...a.services.map(s => s.price)) : 9999999;
-            const minB = b.services?.length > 0 ? Math.min(...b.services.map(s => s.price)) : 9999999;
+            const pricesA = (a.services || []).filter(s => typeof s.price === 'number' && s.price > 0).map(s => s.price);
+            const pricesB = (b.services || []).filter(s => typeof s.price === 'number' && s.price > 0).map(s => s.price);
+            const minA = pricesA.length > 0 ? Math.min(...pricesA) : Number.MAX_SAFE_INTEGER;
+            const minB = pricesB.length > 0 ? Math.min(...pricesB) : Number.MAX_SAFE_INTEGER;
             return minA - minB;
         } else {
             return (a.distanceKm || 0) - (b.distanceKm || 0);
